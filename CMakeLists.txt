@@ -42,6 +42,8 @@ add_library(LutumEngine STATIC
         src/Lutum/Platform/Window.hpp
         src/Lutum/Platform/PlatformContext.cpp
         src/Lutum/Platform/PlatformContext.hpp
+        src/Lutum/Graphics/GraphicsDevice.cpp
+        src/Lutum/Graphics/GraphicsDevice.hpp
 )
 
 target_include_directories(LutumEngine PUBLIC
