@@ -33,28 +33,58 @@ endif()
 
 add_subdirectory(external/SDL_shadercross)
 
-add_executable(${PROJECT_NAME}
-        src/main.cpp
-        src/Core/Application.cpp
-        src/Core/Application.hpp
+# =========================
+# Engine library
+# =========================
+
+add_library(LutumEngine STATIC
+        src/Lutum/Platform/Window.cpp
+        src/Lutum/Platform/Window.hpp
+        src/Lutum/Platform/PlatformContext.cpp
+        src/Lutum/Platform/PlatformContext.hpp
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
+target_include_directories(LutumEngine PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(LutumEngine PUBLIC
         SDL3::SDL3
         SDL3_shadercross::SDL3_shadercross
 )
 
+# =========================
+# Editor executable
+# =========================
+
+add_executable(LutumEditor
+        src/Editor/main.cpp
+        src/Editor/Application.cpp
+        src/Editor/Application.hpp
+)
+
+target_include_directories(LutumEditor PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(LutumEditor PRIVATE
+        LutumEngine
+)
+
+# =========================
 # Runtime shader compiler binaries
+# =========================
+
 if(WIN32)
     if(LUTUM_BUILD_SHADER_TOOLS_FROM_SOURCE)
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        add_custom_command(TARGET LutumEditor POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "$<TARGET_FILE:DirectXShaderCompiler::dxcompiler>"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/dxcompiler.dll"
+                "$<TARGET_FILE_DIR:LutumEditor>/dxcompiler.dll"
 
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "$<TARGET_FILE:DirectXShaderCompiler::dxil>"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/dxil.dll"
+                "$<TARGET_FILE_DIR:LutumEditor>/dxil.dll"
         )
     else()
         set(LUTUM_SHADER_RUNTIME_DIR
@@ -74,14 +104,14 @@ if(WIN32)
             )
         endif()
 
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        add_custom_command(TARGET LutumEditor POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${LUTUM_SHADER_RUNTIME_DIR}/dxcompiler.dll"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/dxcompiler.dll"
+                "$<TARGET_FILE_DIR:LutumEditor>/dxcompiler.dll"
 
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${LUTUM_SHADER_RUNTIME_DIR}/dxil.dll"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/dxil.dll"
+                "$<TARGET_FILE_DIR:LutumEditor>/dxil.dll"
         )
     endif()
 endif()

@@ -12,7 +12,7 @@
 
 #include <cstdlib>
 
-#include "Core/Application.hpp"
+#include "Editor/Application.hpp"
 
 int main(int argc, char ** argv) {
     Lutum::Application app;

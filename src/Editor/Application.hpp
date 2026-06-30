@@ -13,14 +13,28 @@
 #ifndef LUTUM_APP_HPP
 #define LUTUM_APP_HPP
 
+#include <memory>
+
 namespace Lutum {
+
+class Window;
+class PlatformContext;
+
 class Application {
 public:
-    Application() = default;
-    ~Application() = default;
+    Application();
+    ~Application();
+
+    Application(const Application&) = delete;
+    Application& operator=(const Application&) = delete;
 
     bool Initialize();
     void Run();
+    void Terminate();
+
+private:
+    std::unique_ptr<Lutum::PlatformContext> m_platform;
+    std::unique_ptr<Lutum::Window> m_window;
 };
 } // Lutum
 
