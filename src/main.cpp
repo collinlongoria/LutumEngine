@@ -1,3 +1,31 @@
+/*
+* File: App.cpp
+* Project: LutumEngine
+* Author: Collin
+* Created on: 6/30/2026
+*
+* Copyright (c) 2026 Collin Longoria
+*
+* This software is released under the MIT License.
+* https://opensource.org/licenses/MIT
+*/
+
+#include <cstdlib>
+
+#include "Core/Application.hpp"
+
+int main(int argc, char ** argv) {
+    Lutum::Application app;
+
+    if (!app.Initialize())
+        return EXIT_FAILURE;
+
+    app.Run();
+
+    return EXIT_SUCCESS;
+}
+
+/*
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3_shadercross/SDL_shadercross.h>
@@ -120,7 +148,7 @@ int main(int, char**)
     SDL_GPUDevice* gpu = SDL_CreateGPUDevice(
         SDL_GPU_SHADERFORMAT_SPIRV,
         true,
-        "vulkan"
+        nullptr
     );
 
     if (!gpu) {
@@ -254,3 +282,4 @@ int main(int, char**)
 
     return 0;
 }
+*/

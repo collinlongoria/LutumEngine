@@ -35,6 +35,8 @@ add_subdirectory(external/SDL_shadercross)
 
 add_executable(${PROJECT_NAME}
         src/main.cpp
+        src/Core/Application.cpp
+        src/Core/Application.hpp
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
