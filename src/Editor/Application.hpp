@@ -17,8 +17,10 @@
 
 namespace Lutum {
 
+class GraphicsDevice;
 class Window;
 class PlatformContext;
+class Renderer;
 
 class Application {
 public:
@@ -35,6 +37,8 @@ public:
 private:
     std::unique_ptr<Lutum::PlatformContext> m_platform;
     std::unique_ptr<Lutum::Window> m_window;
+    std::unique_ptr<Lutum::GraphicsDevice> m_graphicsDevice;
+    std::unique_ptr<Lutum::Renderer> m_renderer;
 };
 } // Lutum
 

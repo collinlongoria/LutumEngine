@@ -13,10 +13,32 @@
 #ifndef LUTUM_GRAPHICSDEVICE_HPP
 #define LUTUM_GRAPHICSDEVICE_HPP
 
+struct SDL_GPUDevice;
+
 namespace Lutum {
+
+class Window;
+
 class GraphicsDevice {
 public:
-    GraphicsDevice();
+    explicit GraphicsDevice(Window& window);
+    ~GraphicsDevice();
+
+    GraphicsDevice(const GraphicsDevice&) = delete;
+    GraphicsDevice& operator=(const GraphicsDevice&) = delete;
+
+    bool Initialize();
+    void Shutdown();
+
+    [[nodiscard]]
+    SDL_GPUDevice* NativeHandle() const { return m_device; }
+    [[nodiscard]]
+    Window& GetWindow() const { return *m_window; }
+
+private:
+    Window* m_window = nullptr;
+    SDL_GPUDevice* m_device = nullptr;
+    bool m_windowClaimed = false;
 };
 } // Lutum
 

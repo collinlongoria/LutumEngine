@@ -23,7 +23,10 @@ Window::Window(const char *title, int width, int height) {
 }
 
 Window::~Window() {
-    SDL_DestroyWindow(m_window);
+    if (m_window) {
+        SDL_DestroyWindow(m_window);
+        m_window = nullptr;
+    }
 }
 
 void Window::PollEvents() {
