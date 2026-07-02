@@ -34,6 +34,7 @@ public:
     ShaderCompiler& operator=(const ShaderCompiler&) = delete;
 
 private:
+    bool m_initialized = false;
 };
 } // Lutum
 

@@ -26,6 +26,7 @@ bool ShaderCompiler::Initialize() {
         SDL_Log("SDL_ShaderCross_Init failed: %s", SDL_GetError());
         return false;
     }
+    m_initialized = true;
     return true;
 }
 
@@ -96,7 +97,10 @@ std::optional<Shader> ShaderCompiler::LoadHLSL(GraphicsDevice &device, const cha
 }
 
 void ShaderCompiler::Shutdown() {
-    SDL_ShaderCross_Quit();
+    if (m_initialized) {
+        SDL_ShaderCross_Quit();
+        m_initialized = false;
+    }
 }
 
 ShaderCompiler::~ShaderCompiler() {
