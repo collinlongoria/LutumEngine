@@ -52,6 +52,10 @@ add_library(LutumEngine STATIC
         src/Lutum/Graphics/Shader.hpp
         src/Lutum/Graphics/GraphicsPipeline.cpp
         src/Lutum/Graphics/GraphicsPipeline.hpp
+        src/Lutum/Graphics/Buffer.cpp
+        src/Lutum/Graphics/Buffer.hpp
+        src/Lutum/Graphics/BufferUploader.cpp
+        src/Lutum/Graphics/BufferUploader.hpp
 )
 
 target_include_directories(LutumEngine PUBLIC

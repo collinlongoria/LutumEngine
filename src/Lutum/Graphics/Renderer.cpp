@@ -14,6 +14,7 @@
 
 #include <SDL3/SDL_gpu.h>
 
+#include "Lutum/Graphics/BufferUploader.hpp"
 #include "Lutum/Graphics/GraphicsDevice.hpp"
 #include "Lutum/Graphics/Shader.hpp"
 #include "Lutum/Graphics/ShaderCompiler.hpp"
@@ -23,28 +24,23 @@
 namespace Lutum {
 
 // TODO: move to asset files once there's a filesystem layer
+// NOTE: SDL_shadercross requires TEXCOORDn semantics for vertex inputs.
+// TEXCOORD0 -> attribute location 0, TEXCOORD1 -> location 1, etc.
 static const char* kVertexHLSL = R"(
+struct VSInput {
+    float3 position : TEXCOORD0;
+    float3 color    : TEXCOORD1;
+};
+
 struct VSOutput {
     float4 position : SV_Position;
     float3 color    : TEXCOORD0;
 };
 
-VSOutput main(uint vertexID : SV_VertexID) {
-    float2 positions[3] = {
-        float2( 0.0,  0.5),
-        float2( 0.5, -0.5),
-        float2(-0.5, -0.5)
-    };
-
-    float3 colors[3] = {
-        float3(1, 0, 0),
-        float3(0, 1, 0),
-        float3(0, 0, 1)
-    };
-
+VSOutput main(VSInput input) {
     VSOutput o;
-    o.position = float4(positions[vertexID], 0.0, 1.0);
-    o.color = colors[vertexID];
+    o.position = float4(input.position, 1.0);
+    o.color = input.color;
     return o;
 }
 )";
@@ -59,6 +55,11 @@ float4 main(PSInput input) : SV_Target0 {
     return float4(input.color, 1.0);
 }
 )";
+
+struct Vertex {
+    float position[3];
+    float color[3];
+};
 
 Renderer::Renderer(GraphicsDevice &device)
     : m_device(&device)
@@ -79,12 +80,38 @@ bool Renderer::Initialize() {
     pipelineInfo.vertexShader = &*vert;
     pipelineInfo.fragmentShader = &*frag;
     pipelineInfo.primitiveType = PrimitiveType::TRIANGLE_LIST;
+    pipelineInfo.vertexLayout.stride = sizeof(Vertex);
+    pipelineInfo.vertexLayout.attributes = {
+            { 0, VertexFormat::FLOAT3, offsetof(Vertex, position) },
+            { 1, VertexFormat::FLOAT3, offsetof(Vertex, color) },
+        };
 
     std::optional<GraphicsPipeline> pipeline = GraphicsPipeline::Create(*m_device, pipelineInfo);
     if (!pipeline)
         return false;
 
     m_trianglePipeline = std::move(*pipeline);
+
+    // Vertex buffer
+    const Vertex vertices[] = {
+        {{ 0.0f,  0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{ 0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+        {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+    };
+
+    std::optional<Buffer> vbo = Buffer::Create(*m_device, BufferUsage::VERTEX, sizeof(vertices), "triangle_vbo");
+    if (!vbo)
+        return false;
+
+    m_triangleVBO = std::move(*vbo);
+
+    BufferUploader uploader(*m_device);
+    if (!uploader.Begin())
+        return false;
+    if (!uploader.Upload(m_triangleVBO, vertices, sizeof(vertices)))
+        return false;
+    if (!uploader.End())
+        return false;
 
     m_initialized = true;
     return true;
@@ -131,7 +158,11 @@ void Renderer::RenderFrame() {
 
     SDL_BindGPUGraphicsPipeline(pass, m_trianglePipeline.NativeHandle());
 
-    // Important with SV_VertexID: first_vertex must stay 0
+    SDL_GPUBufferBinding vertexBinding = {};
+    vertexBinding.buffer = m_triangleVBO.NativeHandle();
+    vertexBinding.offset = 0;
+    SDL_BindGPUVertexBuffers(pass, 0, &vertexBinding, 1);
+
     SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
 
     SDL_EndGPURenderPass(pass);
@@ -148,6 +179,7 @@ void Renderer::Shutdown() {
     // Make sure the GPU isn't still using the pipeline before releasing it.
     SDL_WaitForGPUIdle(m_device->NativeHandle());
 
+    m_triangleVBO = Buffer{};
     m_trianglePipeline = GraphicsPipeline{};
     m_shaderCompiler.reset();
 

@@ -12,7 +12,9 @@
 
 #ifndef LUTUM_GRAPHICSPIPELINE_HPP
 #define LUTUM_GRAPHICSPIPELINE_HPP
+#include <cstdint>
 #include <optional>
+#include <vector>
 
 struct SDL_GPUGraphicsPipeline;
 
@@ -29,6 +31,26 @@ enum class PrimitiveType {
     POINT_LIST
 };
 
+enum class VertexFormat {
+    FLOAT,
+    FLOAT2,
+    FLOAT3,
+    FLOAT4,
+    UBYTE4_NORM,
+    UINT
+};
+
+struct VertexAttribute {
+    uint32_t location = 0;
+    VertexFormat format = VertexFormat::FLOAT3;
+    uint32_t offset = 0;
+};
+
+struct VertexLayout {
+    uint32_t stride = 0;
+    std::vector<VertexAttribute> attributes;
+};
+
 class GraphicsPipeline {
 public:
     struct CreateInfo {
@@ -36,6 +58,9 @@ public:
         Shader* fragmentShader = nullptr;
         PrimitiveType primitiveType = PrimitiveType::TRIANGLE_LIST;
         // TODO: color target format is currently pulled from swapchain
+
+        // TODO: currently only supports a single vertex buffer at slot 0
+        VertexLayout vertexLayout;
     };
 
     GraphicsPipeline() = default;

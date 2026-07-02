@@ -14,6 +14,7 @@
 #define LUTUM_RENDERER_HPP
 #include <memory>
 
+#include "Lutum/Graphics/Buffer.hpp"
 #include "Lutum/Graphics/GraphicsPipeline.hpp"
 
 namespace Lutum {
@@ -41,6 +42,7 @@ private:
 
     std::unique_ptr<ShaderCompiler> m_shaderCompiler;
     GraphicsPipeline m_trianglePipeline;
+    Buffer m_triangleVBO;
 };
 } // Lutum
 
