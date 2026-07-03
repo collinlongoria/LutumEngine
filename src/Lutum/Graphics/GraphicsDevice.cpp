@@ -16,6 +16,7 @@
 #include <SDL3/SDL_gpu.h>
 
 #include "Lutum/Platform/Window.hpp"
+#include "Lutum/Core/Log.hpp"
 
 namespace Lutum {
 GraphicsDevice::GraphicsDevice(Window &window)
@@ -41,7 +42,7 @@ bool GraphicsDevice::Initialize() {
         return false;
     }
 
-    SDL_Log("GPU Driver: %s", SDL_GetGPUDeviceDriver(m_device));
+    LUTUM_INFO("GPU Driver: {}", SDL_GetGPUDeviceDriver(m_device));
 
     m_windowClaimed = true;
     return true;

@@ -12,6 +12,7 @@
 
 #include "Editor/Application.hpp"
 
+#include "Lutum/Core/Log.hpp"
 #include "Lutum/Platform/PlatformContext.hpp"
 #include "Lutum/Platform/Window.hpp"
 #include "Lutum/Graphics/GraphicsDevice.hpp"
@@ -49,6 +50,8 @@ bool Application::Initialize() {
     );
     m_input.SetRelativeMouseMode(*m_window, true);
 
+    Lutum::Log::Initialize();
+
     return true;
 }
 
@@ -79,5 +82,7 @@ void Application::Terminate() {
     m_renderer.reset();
     m_graphicsDevice.reset();
     m_window.reset();
+
+    Lutum::Log::Shutdown();
 }
 } // Lutum
