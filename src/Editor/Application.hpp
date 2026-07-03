@@ -15,6 +15,11 @@
 
 #include <memory>
 
+#include "Lutum/Core/Time.hpp"
+#include "Lutum/Platform/Input.hpp"
+#include "Lutum/Graphics/Camera.hpp"
+#include "Lutum/Graphics/FlyCameraController.hpp"
+
 namespace Lutum {
 
 class GraphicsDevice;
@@ -39,6 +44,11 @@ private:
     std::unique_ptr<Lutum::Window> m_window;
     std::unique_ptr<Lutum::GraphicsDevice> m_graphicsDevice;
     std::unique_ptr<Lutum::Renderer> m_renderer;
+
+    Time m_time;
+    Input m_input;
+    Camera m_camera;
+    FlyCameraController m_cameraController;
 };
 } // Lutum
 

@@ -40,13 +40,38 @@ bool Application::Initialize() {
     if (!m_renderer->Initialize())
         return false;
 
+    m_camera.SetPosition(Vec3(0.0f, 0.0f, 2.0f));
+    m_camera.SetPerspective(
+        glm::radians(60.0f),
+        static_cast<float>(m_window->DrawableWidth()) / static_cast<float>(m_window->DrawableHeight()),
+        0.1f,
+        1000.0f
+    );
+    m_input.SetRelativeMouseMode(*m_window, true);
+
     return true;
 }
 
 void Application::Run() {
     while (!m_window->ShouldClose()) {
+        m_time.Tick();
         m_window->PollEvents();
-        m_renderer->RenderFrame();
+        m_input.Update();
+
+        // Esc releases the cursor, click recaptures
+        if (m_input.WasKeyPressed(Key::ESCAPE))
+            m_input.SetRelativeMouseMode(*m_window, false);
+        if (!m_input.IsRelativeMouseMode() && m_input.WasMouseButtonPressed(MouseButton::LEFT))
+            m_input.SetRelativeMouseMode(*m_window, true);
+
+        m_cameraController.Update(m_camera, m_input, m_time.DeltaSeconds());
+
+        m_camera.SetAspect(
+            static_cast<float>(m_window->DrawableWidth()) /
+            static_cast<float>(m_window->DrawableHeight())
+        );
+
+        m_renderer->RenderFrame(m_camera);
     }
 }
 

@@ -33,6 +33,9 @@ endif()
 
 add_subdirectory(external/SDL_shadercross)
 
+# GLM
+add_subdirectory(external/glm)
+
 # =========================
 # Engine library
 # =========================
@@ -56,6 +59,15 @@ add_library(LutumEngine STATIC
         src/Lutum/Graphics/Buffer.hpp
         src/Lutum/Graphics/BufferUploader.cpp
         src/Lutum/Graphics/BufferUploader.hpp
+        src/Lutum/Core/Math.hpp
+        src/Lutum/Core/Time.cpp
+        src/Lutum/Core/Time.hpp
+        src/Lutum/Platform/Input.cpp
+        src/Lutum/Platform/Input.hpp
+        src/Lutum/Graphics/Camera.cpp
+        src/Lutum/Graphics/Camera.hpp
+        src/Lutum/Graphics/FlyCameraController.cpp
+        src/Lutum/Graphics/FlyCameraController.hpp
 )
 
 target_include_directories(LutumEngine PUBLIC
@@ -65,6 +77,7 @@ target_include_directories(LutumEngine PUBLIC
 target_link_libraries(LutumEngine PUBLIC
         SDL3::SDL3
         SDL3_shadercross::SDL3_shadercross
+        glm::glm
 )
 
 # =========================

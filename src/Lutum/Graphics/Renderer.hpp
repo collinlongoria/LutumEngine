@@ -16,6 +16,7 @@
 
 #include "Lutum/Graphics/Buffer.hpp"
 #include "Lutum/Graphics/GraphicsPipeline.hpp"
+#include "Lutum/Graphics/Camera.hpp"
 
 namespace Lutum {
 
@@ -32,7 +33,7 @@ public:
     Renderer& operator=(const Renderer&) = delete;
 
     bool Initialize();
-    void RenderFrame();
+    void RenderFrame(const Camera& camera);
     void Shutdown();
 
 private:

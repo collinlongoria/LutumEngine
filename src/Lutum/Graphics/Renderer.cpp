@@ -23,10 +23,20 @@
 
 namespace Lutum {
 
+struct FrameUniforms {
+    Mat4 viewProj;
+};
+
 // TODO: move to asset files once there's a filesystem layer
 // NOTE: SDL_shadercross requires TEXCOORDn semantics for vertex inputs.
 // TEXCOORD0 -> attribute location 0, TEXCOORD1 -> location 1, etc.
+// NOTE: SDL_GPU convention via shadercross: vertex uniform buffers live in space1.
+// (Fragment uniforms would be space3.) register(b0, space1) -> uniform slot 0.
 static const char* kVertexHLSL = R"(
+cbuffer FrameUniforms : register(b0, space1) {
+    float4x4 viewProj;
+};
+
 struct VSInput {
     float3 position : TEXCOORD0;
     float3 color    : TEXCOORD1;
@@ -39,7 +49,7 @@ struct VSOutput {
 
 VSOutput main(VSInput input) {
     VSOutput o;
-    o.position = float4(input.position, 1.0);
+    o.position = mul(viewProj, float4(input.position, 1.0));
     o.color = input.color;
     return o;
 }
@@ -117,7 +127,7 @@ bool Renderer::Initialize() {
     return true;
 }
 
-void Renderer::RenderFrame() {
+void Renderer::RenderFrame(const Camera& camera) {
     if (!m_initialized)
         return;
 
@@ -147,6 +157,10 @@ void Renderer::RenderFrame() {
         SDL_SubmitGPUCommandBuffer(cmd);
         return;
     }
+
+    FrameUniforms uniforms = {};
+    uniforms.viewProj = camera.ViewProjectionMatrix();
+    SDL_PushGPUVertexUniformData(cmd, 0, &uniforms, sizeof(uniforms));
 
     SDL_GPUColorTargetInfo colorTarget = {};
     colorTarget.texture = swapchainTexture;
