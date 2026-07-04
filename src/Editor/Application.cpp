@@ -25,7 +25,7 @@
 namespace Lutum {
 Application::Application() = default;
 Application::~Application() {
-    Terminate();
+    Shutdown();
 }
 
 bool Application::Initialize() {
@@ -85,9 +85,9 @@ void Application::Run() {
     }
 }
 
-void Application::Terminate() {
-    if (m_terminated) return;
-    m_terminated = true;
+void Application::Shutdown() {
+    if (m_shutdown) return;
+    m_shutdown = true;
 
     m_renderer.reset();
     m_graphicsDevice.reset();

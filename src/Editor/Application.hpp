@@ -37,7 +37,7 @@ public:
 
     bool Initialize();
     void Run();
-    void Terminate();
+    void Shutdown();
 
 private:
     std::unique_ptr<Lutum::PlatformContext> m_platform;
@@ -50,7 +50,7 @@ private:
     Camera m_camera;
     FlyCameraController m_cameraController;
 
-    bool m_terminated = false;
+    bool m_shutdown = false;
 };
 } // Lutum
 
