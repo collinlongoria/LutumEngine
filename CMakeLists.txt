@@ -96,6 +96,9 @@ add_library(LutumEngine STATIC
         src/Lutum/ECS/Registry.cpp
         src/Lutum/ECS/Query.hpp
         src/Lutum/ECS/CommandBuffer.hpp
+        src/Lutum/ECS/Resource.hpp
+        src/Lutum/ECS/Scheduler.hpp
+        src/Lutum/ECS/Scheduler.cpp
 )
 
 target_include_directories(LutumEngine PUBLIC
