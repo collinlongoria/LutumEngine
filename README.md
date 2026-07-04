@@ -1,5 +1,5 @@
-<p align="center">
-  <img src="public/banner.png" alt="Lutum Engine banner" width="100%">
+<p>
+  <img src="public/Banner.png" alt="Lutum Engine banner" width="728">
 </p>
 
 [![Build and Test](https://github.com/collinlongoria/LutumEngine/actions/workflows/build.yml/badge.svg)](https://github.com/collinlongoria/LutumEngine/actions/workflows/build.yml)

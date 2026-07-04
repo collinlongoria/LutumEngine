@@ -15,6 +15,11 @@ option(LUTUM_BUILD_TESTS
         ON
 )
 
+option(LUTUM_ENABLE_DEBUG_UI
+        "Compile Dear ImGui debug UI support"
+        ON
+)
+
 # SDL
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON  CACHE BOOL "" FORCE)
@@ -46,6 +51,27 @@ if(LUTUM_BUILD_TESTS)
     enable_testing()
     add_subdirectory(external/doctest)
     add_subdirectory(tests)
+endif()
+
+# Dear ImGui (Docking)
+add_library(imgui STATIC
+        external/imgui/imgui.cpp
+        external/imgui/imgui_demo.cpp
+        external/imgui/imgui_draw.cpp
+        external/imgui/imgui_tables.cpp
+        external/imgui/imgui_widgets.cpp
+        external/imgui/backends/imgui_impl_sdl3.cpp
+        external/imgui/backends/imgui_impl_sdlgpu3.cpp
+)
+target_include_directories(imgui PUBLIC
+        external/imgui
+        external/imgui/backends
+)
+target_link_libraries(imgui PUBLIC SDL3::SDL3)
+
+if (LUTUM_ENABLE_DEBUG_UI)
+    target_link_libraries(LutumEngine PUBLIC imgui)
+    target_compile_definitions(LutumEngine PUBLIC LUTUM_ENABLE_DEBUG_UI=1)
 endif()
 
 # =========================
