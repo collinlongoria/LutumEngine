@@ -74,15 +74,15 @@ void RegisterCameraSystems(Curia::Scheduler& scheduler) {
         });
 
     scheduler.AddSystem("CameraAspect")
-        .ReadsResource<WindowInfo>()
+        .ReadsResource<ViewportInfo>()
         .Writes<CameraComponent>()
         .Execute([query = Query<CameraComponent>{}](Registry& registry, CommandBuffer&) mutable {
-            const WindowInfo& window = registry.GetResource<WindowInfo>();
-            if (window.drawableWidth == 0 || window.drawableHeight == 0)
+            const ViewportInfo& window = registry.GetResource<ViewportInfo>();
+            if (window.width == 0 || window.height == 0)
                 return;
 
-            const float aspect = static_cast<float>(window.drawableWidth) /
-                                 static_cast<float>(window.drawableHeight);
+            const float aspect = static_cast<float>(window.width) /
+                                 static_cast<float>(window.height);
 
             query.Refresh(registry);
             query.Each([aspect](CameraComponent& camera) {

@@ -118,6 +118,8 @@ add_library(LutumEngine STATIC
         src/Lutum/ECS/Scheduler.cpp
         src/Lutum/Graphics/RenderTarget.cpp
         src/Lutum/Graphics/RenderTarget.hpp
+        src/Lutum/Debug/DebugUI.cpp
+        src/Lutum/Debug/DebugUI.hpp
 )
 
 target_include_directories(LutumEngine PUBLIC
@@ -147,6 +149,8 @@ add_executable(LutumEditor
         src/Lutum/Scene/Camera.hpp
         src/Lutum/Scene/CameraSystems.cpp
         src/Lutum/Scene/CameraSystems.hpp
+        src/Editor/EditorUI.cpp
+        src/Editor/EditorUI.hpp
 )
 
 target_include_directories(LutumEditor PRIVATE

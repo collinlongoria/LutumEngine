@@ -14,6 +14,7 @@
 
 #include <SDL3/SDL_gpu.h>
 
+#include "Lutum/Debug/DebugUI.hpp"
 #include "Lutum/Graphics/BufferUploader.hpp"
 #include "Lutum/Graphics/GraphicsDevice.hpp"
 #include "Lutum/Graphics/Shader.hpp"
@@ -76,21 +77,10 @@ Renderer::Renderer(GraphicsDevice &device)
 {
 }
 
-bool Renderer::Initialize() {
+bool Renderer::Initialize(const RenderTarget& sceneTarget) {
     m_shaderCompiler = std::make_unique<ShaderCompiler>();
     if (!m_shaderCompiler->Initialize())
         return false;
-
-    RenderTarget::CreateInfo targetInfo = {};
-    targetInfo.width = static_cast<uint32_t>(m_device->GetWindow().DrawableWidth());
-    targetInfo.height = static_cast<uint32_t>(m_device->GetWindow().DrawableHeight());
-    targetInfo.offscreen = false;
-    targetInfo.hasDepth = true;
-
-    std::optional<RenderTarget> target = RenderTarget::Create(*m_device, targetInfo);
-    if (!target)
-        return false;
-    m_sceneTarget = std::move(*target);
 
     std::optional<Shader> vert = m_shaderCompiler->LoadHLSL(*m_device, kVertexHLSL, ShaderStage::VERTEX);
     std::optional<Shader> frag = m_shaderCompiler->LoadHLSL(*m_device, kFragmentHLSL, ShaderStage::FRAGMENT);
@@ -109,33 +99,31 @@ bool Renderer::Initialize() {
     pipelineInfo.depthState.testEnabled = true;
     pipelineInfo.depthState.writeEnabled = true;
     pipelineInfo.depthState.compareOp = CompareOp::LESS;
-    pipelineInfo.colorFormat = m_sceneTarget.NativeColorFormat();
-    pipelineInfo.depthFormat = m_sceneTarget.NativeDepthFormat();
+
+    pipelineInfo.colorFormat = sceneTarget.NativeColorFormat();
+    pipelineInfo.depthFormat = sceneTarget.NativeDepthFormat();
 
     std::optional<GraphicsPipeline> pipeline = GraphicsPipeline::Create(*m_device, pipelineInfo);
     if (!pipeline)
         return false;
 
-    m_trianglePipeline = std::move(*pipeline);
+    m_placeholderPipeline = std::move(*pipeline);
 
     // Vertex buffer
-    // Red triangle NEARER (z=0.0) but drawn FIRST; blue FARTHER (z=0.5) drawn second
-    // Without depth testing blue would overwrite red in the overlap
     const Vertex vertices[] = {
         {{-0.6f, -0.4f, 0.0f}, {1, 0, 0}}, {{ 0.2f, -0.4f, 0.0f}, {1, 0, 0}}, {{-0.2f, 0.5f, 0.0f}, {1, 0, 0}},
         {{-0.2f, -0.4f, 0.5f}, {0, 0, 1}}, {{ 0.6f, -0.4f, 0.5f}, {0, 0, 1}}, {{ 0.2f, 0.5f, 0.5f}, {0, 0, 1}},
     };
 
-    std::optional<Buffer> vbo = Buffer::Create(*m_device, BufferUsage::VERTEX, sizeof(vertices), "triangle_vbo");
+    std::optional<Buffer> vbo = Buffer::Create(*m_device, BufferUsage::VERTEX, sizeof(vertices), "placeholder_vbo");
     if (!vbo)
         return false;
-
-    m_triangleVBO = std::move(*vbo);
+    m_placeholderVBO = std::move(*vbo);
 
     BufferUploader uploader(*m_device);
     if (!uploader.Begin())
         return false;
-    if (!uploader.Upload(m_triangleVBO, vertices, sizeof(vertices)))
+    if (!uploader.Upload(m_placeholderVBO, vertices, sizeof(vertices)))
         return false;
     if (!uploader.End())
         return false;
@@ -144,13 +132,39 @@ bool Renderer::Initialize() {
     return true;
 }
 
-void Renderer::RenderFrame(Curia::Registry& registry) {
+bool Renderer::BeginFrame() {
     if (!m_initialized)
+        return false;
+
+    m_cmd = SDL_AcquireGPUCommandBuffer(m_device->NativeHandle());
+    if (!m_cmd) {
+        LUTUM_ERROR("SDL_AcquireGPUCommandBuffer failed: {}", SDL_GetError());
+        return false;
+    }
+
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(m_cmd, m_device->GetWindow().NativeHandle(), &m_swapchainTexture, nullptr, nullptr)) {
+        LUTUM_ERROR("SDL_WaitAndAcquireGPUSwapchainTexture failed: {}", SDL_GetError());
+        SDL_CancelGPUCommandBuffer(m_cmd);
+        m_cmd = nullptr;
+        return false;
+    }
+
+    if (!m_swapchainTexture) {
+        // Swapchain unavailable (minimized). Must still submit.
+        SDL_SubmitGPUCommandBuffer(m_cmd);
+        m_cmd = nullptr;
+        return false;
+    }
+
+    m_swapchainDrawn = false;
+    return true;
+}
+
+void Renderer::RenderScene(Curia::Registry& registry, RenderTarget& target) {
+    if (!m_cmd || !m_initialized)
         return;
 
-    // Find the active camera
     m_cameraQuery.Refresh(registry);
-
     bool hasCamera = false;
     Mat4 viewProj(1.0f);
     m_cameraQuery.Each([&](Transform& transform, CameraComponent& camera) {
@@ -160,65 +174,56 @@ void Renderer::RenderFrame(Curia::Registry& registry) {
         }
     });
 
-    const uint32_t drawableW = static_cast<uint32_t>(m_device->GetWindow().DrawableWidth());
-    const uint32_t drawableH = static_cast<uint32_t>(m_device->GetWindow().DrawableHeight());
-    if (drawableW == 0 || drawableH == 0)
-        return;
-    m_sceneTarget.Resize(drawableW, drawableH);
-
-    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(m_device->NativeHandle());
-    if (!cmd) {
-        SDL_Log("SDL_AcquireGPUCommandBuffer failed: %s", SDL_GetError());
-        return;
-    }
-
-    SDL_GPUTexture* swapchainTexture = nullptr;
-    Uint32 swapchainWidth = 0;
-    Uint32 swapchainHeight = 0;
-
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(
-            cmd,
-            m_device->GetWindow().NativeHandle(),
-            &swapchainTexture,
-            &swapchainWidth,
-            &swapchainHeight))
-    {
-        SDL_Log("SDL_WaitAndAcquireGPUSwapchainTexture failed: %s", SDL_GetError());
-        SDL_CancelGPUCommandBuffer(cmd);
-        return;
-    }
-
-    if (swapchainTexture == nullptr) {
-        SDL_SubmitGPUCommandBuffer(cmd);
-        return;
-    }
-
     if (hasCamera) {
         FrameUniforms uniforms = {};
         uniforms.viewProj = viewProj;
-        SDL_PushGPUVertexUniformData(cmd, 0, &uniforms, sizeof(uniforms));
+        SDL_PushGPUVertexUniformData(m_cmd, 0, &uniforms, sizeof(uniforms));
     }
 
-    SDL_GPURenderPass* pass = m_sceneTarget.BeginRenderPass(cmd, swapchainTexture, Vec4(0.08f, 0.08f, 0.10f, 1.0f));
-    if (!pass) {
-        SDL_SubmitGPUCommandBuffer(cmd);
+    SDL_GPUTexture* swapchain = target.IsOffscreen() ? nullptr : m_swapchainTexture;
+    SDL_GPURenderPass* pass = target.BeginRenderPass(m_cmd, swapchain, Vec4(0.08f, 0.08f, 0.10f, 1.0f));
+    if (!pass)
         return;
+
+    if (hasCamera) {
+        SDL_BindGPUGraphicsPipeline(pass, m_placeholderPipeline.NativeHandle());
+        SDL_GPUBufferBinding vertexBinding = {m_placeholderVBO.NativeHandle(), 0};
+        SDL_BindGPUVertexBuffers(pass, 0, &vertexBinding, 1);
+        SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0);
     }
-
-    SDL_BindGPUGraphicsPipeline(pass, m_trianglePipeline.NativeHandle());
-
-    SDL_GPUBufferBinding vertexBinding = {};
-    vertexBinding.buffer = m_triangleVBO.NativeHandle();
-    vertexBinding.offset = 0;
-    SDL_BindGPUVertexBuffers(pass, 0, &vertexBinding, 1);
-
-    SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0);
 
     SDL_EndGPURenderPass(pass);
 
-    if (!SDL_SubmitGPUCommandBuffer(cmd)) {
-        SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+    if (!target.IsOffscreen())
+        m_swapchainDrawn = true;
+}
+
+void Renderer::RenderDebugUI() {
+    if (!m_cmd || !Debug::UI::IsInitialized())
+        return;
+
+    Debug::UI::PrepareRender(m_cmd);
+
+    SDL_GPUColorTargetInfo colorTarget = {};
+    colorTarget.texture = m_swapchainTexture;
+    colorTarget.clear_color = SDL_FColor{0.0f, 0.0f, 0.0f, 1.0f};
+    colorTarget.load_op = m_swapchainDrawn ? SDL_GPU_LOADOP_LOAD : SDL_GPU_LOADOP_CLEAR;
+    colorTarget.store_op = SDL_GPU_STOREOP_STORE;
+
+    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(m_cmd, &colorTarget, 1, nullptr);
+    Debug::UI::Render(m_cmd, pass);
+    SDL_EndGPURenderPass(pass);
+}
+
+void Renderer::EndFrame() {
+    if (!m_cmd)
+        return;
+
+    if (!SDL_SubmitGPUCommandBuffer(m_cmd)) {
+        LUTUM_ERROR("SDL_SubmitGPUCommandBuffer failed: {}", SDL_GetError());
     }
+    m_cmd = nullptr;
+    m_swapchainTexture = nullptr;
 }
 
 void Renderer::Shutdown() {
@@ -228,8 +233,8 @@ void Renderer::Shutdown() {
     // Make sure the GPU isn't still using the pipeline before releasing it.
     SDL_WaitForGPUIdle(m_device->NativeHandle());
 
-    m_triangleVBO = Buffer{};
-    m_trianglePipeline = GraphicsPipeline{};
+    m_placeholderVBO = Buffer{};
+    m_placeholderPipeline = GraphicsPipeline{};
     m_shaderCompiler.reset();
 
     m_initialized = false;

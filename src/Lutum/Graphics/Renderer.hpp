@@ -36,8 +36,15 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    bool Initialize();
-    void RenderFrame(Curia::Registry& registry);
+    bool Initialize(const RenderTarget& sceneTarget);
+
+    // Frame flow: BeginFrame -> RenderScene (0+ times) -> RenderDebugUI (optional) -> EndFrame
+    // BeginFrame false = skip frame entirely
+    bool BeginFrame();
+    void RenderScene(Curia::Registry& registry, RenderTarget& target);
+    void RenderDebugUI();
+    void EndFrame();
+
     void Shutdown();
 
 private:
@@ -47,8 +54,12 @@ private:
 
     std::unique_ptr<ShaderCompiler> m_shaderCompiler;
 
-    GraphicsPipeline m_trianglePipeline;
-    Buffer m_triangleVBO;
+    SDL_GPUCommandBuffer* m_cmd = nullptr;
+    SDL_GPUTexture* m_swapchainTexture = nullptr;
+    bool m_swapchainDrawn = false; // decides LOAD vs CLEAR for the UI pass
+
+    GraphicsPipeline m_placeholderPipeline;
+    Buffer m_placeholderVBO;
     RenderTarget m_sceneTarget;
 
     Curia::Query<Transform, CameraComponent, Curia::With<ActiveCamera>> m_cameraQuery;

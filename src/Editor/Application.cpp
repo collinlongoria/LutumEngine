@@ -18,6 +18,7 @@
 #include "Lutum/Core/Jobs.hpp"
 #include "Lutum/Core/Log.hpp"
 #include "Lutum/Core/Time.hpp"
+#include "Lutum/Debug/DebugUI.hpp"
 #include "Lutum/Graphics/GraphicsDevice.hpp"
 #include "Lutum/Graphics/Renderer.hpp"
 #include "Lutum/Platform/Input.hpp"
@@ -51,14 +52,33 @@ bool Application::Initialize() {
     if (!m_graphicsDevice->Initialize())
         return false;
 
-    m_renderer = std::make_unique<Lutum::Renderer>(*m_graphicsDevice);
-    if (!m_renderer->Initialize())
+    RenderTarget::CreateInfo targetInfo = {};
+    targetInfo.width = 1280;
+    targetInfo.height = 720;
+    targetInfo.offscreen = true;
+    targetInfo.colorFormat = TargetFormat::RGBA8_UNORM;
+    targetInfo.hasDepth = true;
+
+    std::optional<RenderTarget> target = RenderTarget::Create(*m_graphicsDevice, targetInfo);
+    if (!target)
         return false;
+    m_sceneTarget = std::move(*target);
+
+    m_renderer = std::make_unique<Renderer>(*m_graphicsDevice);
+    if (!m_renderer->Initialize(m_sceneTarget))
+        return false;
+
+    if (!Debug::UI::Initialize(*m_graphicsDevice))
+        return false;
+
+    m_window->SetEventHook([](const SDL_Event& event) {
+        Debug::UI::ProcessEvent(event);
+    });
 
     // Resources
     m_registry.SetResource<Time>();
     m_registry.SetResource<Input>();
-    m_registry.SetResource<WindowInfo>();
+    m_registry.SetResource<ViewportInfo>();
 
     // Systems
     RegisterCameraSystems(m_scheduler);
@@ -90,20 +110,22 @@ void Application::Run() {
         Input& input = m_registry.GetResource<Input>();
         input.Update();
 
-        if (input.WasKeyPressed(Key::ESCAPE))
-            input.SetRelativeMouseMode(*m_window, false);
-        if (!input.IsRelativeMouseMode() && input.WasMouseButtonPressed(MouseButton::LEFT))
-            input.SetRelativeMouseMode(*m_window, true);
+        // Editor fly controls: relative mouse while RMB held over the viewport.
+        const ViewportInfo& viewport = m_registry.GetResource<ViewportInfo>();
+        const bool wantFly = viewport.hovered && input.IsMouseButtonDown(MouseButton::RIGHT);
+        if (wantFly != input.IsRelativeMouseMode())
+            input.SetRelativeMouseMode(*m_window, wantFly);
 
-        WindowInfo& windowInfo = m_registry.GetResource<WindowInfo>();
-        windowInfo.drawableWidth = static_cast<uint32_t>(m_window->DrawableWidth());
-        windowInfo.drawableHeight = static_cast<uint32_t>(m_window->DrawableHeight());
+        Debug::UI::BeginFrame();
+        m_editorUI.Draw(m_registry, m_scheduler, m_sceneTarget);   // writes ViewportInfo, resizes target
 
-        // Simulation
         m_scheduler.Run();
 
-        // Presentation
-        m_renderer->RenderFrame(m_registry);
+        if (m_renderer->BeginFrame()) {
+            m_renderer->RenderScene(m_registry, m_sceneTarget);
+            m_renderer->RenderDebugUI();
+            m_renderer->EndFrame();
+        }
     }
 }
 
@@ -111,7 +133,12 @@ void Application::Shutdown() {
     if (m_shutdown) return;
     m_shutdown = true;
 
+    Debug::UI::Shutdown();
+
     m_renderer.reset();
+
+    m_sceneTarget = RenderTarget();
+
     m_graphicsDevice.reset();
     m_window.reset();
     m_platform.reset();

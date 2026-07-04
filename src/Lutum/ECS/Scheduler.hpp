@@ -106,6 +106,22 @@ public:
         return false;
     }
 
+    // Compiled phase layout as names, for tooling/UI
+    // Empty if not compiled
+    [[nodiscard]]
+    std::vector<std::vector<std::string_view>> PhaseNames() const {
+        std::vector<std::vector<std::string_view>> result;
+        result.reserve(m_phases.size());
+        for (const auto& phase : m_phases) {
+            auto& names = result.emplace_back();
+            names.reserve(phase.size());
+            for (const SystemNode* system : phase) {
+                names.push_back(system->name);
+            }
+        }
+        return result;
+    }
+
 private:
     struct SystemNode {
         std::string name;

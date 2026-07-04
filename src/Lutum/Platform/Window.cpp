@@ -34,6 +34,9 @@ void Window::PollEvents() {
 
     while (SDL_PollEvent(&event))
     {
+        if (m_eventHook)
+            m_eventHook(event);
+
         switch (event.type)
         {
             case SDL_EVENT_QUIT:

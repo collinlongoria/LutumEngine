@@ -13,15 +13,20 @@
 #ifndef LUTUM_WINDOW_HPP
 #define LUTUM_WINDOW_HPP
 #include <cstdint>
+#include <functional>
 
 struct SDL_Window;
+union SDL_Event;
 
 namespace Lutum {
 
-// Resource: written by Application each frame, read by systems
-struct WindowInfo {
-    uint32_t drawableWidth = 0;
-    uint32_t drawableHeight = 0;
+// Resource: describes the surface the scene camera renders to
+// In the editor the viewport panel writes it; in a game runtime the window does
+struct ViewportInfo {
+    uint32_t width = 0;
+    uint32_t height = 0;
+    bool hovered = false;
+    bool focused = false;
 };
 
 class Window {
@@ -50,8 +55,14 @@ public:
     [[nodiscard]]
     bool IsMinimized() const { return m_minimized; }
 
+    // Called for every SDL event before Window's own handling.
+    void SetEventHook(std::function<void(const SDL_Event&)> hook) { m_eventHook = std::move(hook); }
+
 private:
     SDL_Window *m_window = nullptr;
+
+    std::function<void(const SDL_Event&)> m_eventHook;
+
     bool m_minimized = false;
     bool m_shouldClose = false;
 };

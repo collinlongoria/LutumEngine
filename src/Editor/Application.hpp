@@ -17,6 +17,8 @@
 
 #include "Lutum/ECS/Registry.hpp"
 #include "Lutum/ECS/Scheduler.hpp"
+#include "Editor/EditorUI.hpp"
+#include "Lutum/Graphics/RenderTarget.hpp"
 
 namespace Lutum {
 
@@ -45,6 +47,9 @@ private:
 
     Curia::Registry m_registry;
     Curia::Scheduler m_scheduler{m_registry};
+
+    RenderTarget m_sceneTarget;
+    EditorUI m_editorUI;
 
     bool m_shutdown = false;
 };
