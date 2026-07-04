@@ -14,8 +14,11 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <atomic>
 
 #include "Lutum/ECS/Registry.hpp"
+#include "Lutum/ECS/Query.hpp"
+#include "Lutum/ECS/CommandBuffer.hpp"
 
 namespace {
 
@@ -38,6 +41,12 @@ struct Small {
 };
 
 struct DeadTag {};
+
+struct Frozen {};
+
+struct MeshHandle {
+    uint32_t id;
+};
 
 }
 
@@ -107,4 +116,124 @@ TEST_CASE("Curia World remove observer fires during destroy while component is r
     CHECK(observerFired);
     CHECK(sawExpectedValue);
     CHECK_FALSE(world.Alive(c));
+}
+
+TEST_CASE("Curia Registry supports filtered queries") {
+    Registry registry;
+
+    for (int i = 0; i < 10'000; ++i) {
+        Entity e = registry.Create();
+
+        registry.Add(e, Position{static_cast<float>(i), 0, 0});
+        registry.Add(e, Velocity{1, 0, 0});
+
+        if (i % 2 == 0) {
+            registry.Add<Frozen>(e);
+        }
+
+        if (i % 3 == 0) {
+            registry.Add(e, MeshHandle{static_cast<uint32_t>(i)});
+        }
+    }
+
+    Query<Position, Velocity, Without<Frozen>> moveQuery;
+    moveQuery.Refresh(registry);
+
+    moveQuery.Each([](Position& p, Velocity& v) {
+        p.x += v.x;
+    });
+
+    Query<Position, With<Frozen>> frozenQuery;
+    frozenQuery.Refresh(registry);
+
+    uint32_t frozenCount = 0;
+
+    frozenQuery.Each([&](Position&) {
+        ++frozenCount;
+    });
+
+    CHECK(frozenCount == 5000);
+}
+
+TEST_CASE("Curia Registry supports parallel query iteration") {
+    Registry registry;
+
+    uint64_t expectedSum = 0;
+
+    for (int i = 0; i < 10'000; ++i) {
+        Entity e = registry.Create();
+
+        registry.Add(e, Position{static_cast<float>(i), 0, 0});
+        registry.Add(e, Velocity{1, 0, 0});
+
+        if (i % 2 == 0) {
+            registry.Add<Frozen>(e);
+        }
+
+        if (i % 3 == 0) {
+            registry.Add(e, MeshHandle{static_cast<uint32_t>(i)});
+            expectedSum += static_cast<uint64_t>(i);
+        }
+    }
+
+    std::atomic<uint64_t> parSum{0};
+
+    Query<MeshHandle> meshQuery;
+    meshQuery.Refresh(registry);
+
+    meshQuery.ParEach([&](MeshHandle& m) {
+        parSum.fetch_add(m.id, std::memory_order_relaxed);
+    });
+
+    CHECK(parSum.load(std::memory_order_relaxed) == expectedSum);
+}
+
+TEST_CASE("Curia Registry supports deferred command buffer changes") {
+    Registry registry;
+
+    for (int i = 0; i < 10'000; ++i) {
+        Entity e = registry.Create();
+
+        registry.Add(e, Position{static_cast<float>(i), 0, 0});
+        registry.Add(e, Velocity{1, 0, 0});
+
+        if (i % 2 == 0) {
+            registry.Add<Frozen>(e);
+        }
+
+        if (i % 3 == 0) {
+            registry.Add(e, MeshHandle{static_cast<uint32_t>(i)});
+        }
+    }
+
+    Query<Position, Velocity, Without<Frozen>> moveQuery;
+    moveQuery.Refresh(registry);
+
+    CommandBuffer cmd;
+
+    Entity newbie = cmd.CreateDeferred();
+
+    cmd.Add(newbie, Position{-1, -1, -1});
+    cmd.Add<Frozen>(newbie);
+
+    moveQuery.EachWithEntity([&](Entity e, Position& p, Velocity&) {
+        if (p.x > 9990.0f) {
+            cmd.Destroy(e);
+        }
+    });
+
+    cmd.Execute(registry);
+
+    CHECK(cmd.Empty());
+
+    Query<Position, With<Frozen>> frozenQuery;
+    frozenQuery.Refresh(registry);
+
+    uint32_t frozenCount = 0;
+
+    frozenQuery.Each([&](Position&) {
+        ++frozenCount;
+    });
+
+    CHECK(frozenCount == 5001);
 }

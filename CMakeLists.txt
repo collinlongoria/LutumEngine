@@ -94,6 +94,8 @@ add_library(LutumEngine STATIC
         src/Lutum/ECS/Archetype.cpp
         src/Lutum/ECS/Registry.hpp
         src/Lutum/ECS/Registry.cpp
+        src/Lutum/ECS/Query.hpp
+        src/Lutum/ECS/CommandBuffer.hpp
 )
 
 target_include_directories(LutumEngine PUBLIC
