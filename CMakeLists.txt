@@ -10,6 +10,11 @@ option(LUTUM_BUILD_SHADER_TOOLS_FROM_SOURCE
         ON
 )
 
+option(LUTUM_BUILD_TESTS
+        "Build LutumEngine tests"
+        ON
+)
+
 # SDL
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON  CACHE BOOL "" FORCE)
@@ -35,6 +40,13 @@ add_subdirectory(external/SDL_shadercross)
 
 # GLM
 add_subdirectory(external/glm)
+
+# doctest and tests
+if(LUTUM_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(external/doctest)
+    add_subdirectory(tests)
+endif()
 
 # =========================
 # Engine library
