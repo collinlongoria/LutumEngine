@@ -24,7 +24,9 @@
 
 namespace Lutum {
 Application::Application() = default;
-Application::~Application() = default;
+Application::~Application() {
+    Terminate();
+}
 
 bool Application::Initialize() {
     Log::Initialize();
@@ -84,6 +86,9 @@ void Application::Run() {
 }
 
 void Application::Terminate() {
+    if (m_terminated) return;
+    m_terminated = true;
+
     m_renderer.reset();
     m_graphicsDevice.reset();
     m_window.reset();

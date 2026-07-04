@@ -136,23 +136,24 @@ namespace Jobs {
     void Shutdown() {
         JobsState& state = State();
 
-        if (!state.running.load(std::memory_order_relaxed))
-            return;
-
-        // Drain: keep helping until the queue is empty so no enqueued work is lost
-        while (TryRunOneJob()) {}
-
         {
             std::lock_guard lock(state.queueMutex);
-            state.running.store(false, std::memory_order_relaxed);
+
+            if (!state.running.load(std::memory_order_acquire))
+                return;
+
+            state.running.store(false, std::memory_order_release);
         }
+
         state.queueCV.notify_all();
 
         for (std::thread& worker : state.workers) {
             if (worker.joinable())
                 worker.join();
         }
+
         state.workers.clear();
+        state.queue.clear();
 
         LUTUM_INFO("Job system shut down");
     }
@@ -168,17 +169,18 @@ namespace Jobs {
             JobsInternal::Increment(*counter);
         }
 
-        if (!state.running.load(std::memory_order_relaxed)) {
-            // No pool: run inline so callers never silently lose work
-            Job inlineJob{std::move(job), counter};
-            RunJob(inlineJob);
-            return;
-        }
-
         {
             std::lock_guard lock(state.queueMutex);
+
+            if (!state.running.load(std::memory_order_acquire)) {
+                Job inlineJob{std::move(job), counter};
+                RunJob(inlineJob);
+                return;
+            }
+
             state.queue.push_back(Job{std::move(job), counter});
         }
+
         state.queueCV.notify_one();
     }
 

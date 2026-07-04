@@ -49,6 +49,8 @@ private:
     Input m_input;
     Camera m_camera;
     FlyCameraController m_cameraController;
+
+    bool m_terminated = false;
 };
 } // Lutum
 
