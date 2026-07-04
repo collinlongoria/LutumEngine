@@ -127,9 +127,21 @@ bool Renderer::Initialize() {
     return true;
 }
 
-void Renderer::RenderFrame(const Camera& camera) {
+void Renderer::RenderFrame(Curia::Registry& registry) {
     if (!m_initialized)
         return;
+
+    // Find the active camera
+    m_cameraQuery.Refresh(registry);
+
+    bool hasCamera = false;
+    Mat4 viewProj(1.0f);
+    m_cameraQuery.Each([&](Transform& transform, CameraComponent& camera) {
+        if (!hasCamera) {
+            viewProj = CameraMath::ViewProjection(transform, camera);
+            hasCamera = true;
+        }
+    });
 
     SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(m_device->NativeHandle());
     if (!cmd) {
@@ -158,9 +170,11 @@ void Renderer::RenderFrame(const Camera& camera) {
         return;
     }
 
-    FrameUniforms uniforms = {};
-    uniforms.viewProj = camera.ViewProjectionMatrix();
-    SDL_PushGPUVertexUniformData(cmd, 0, &uniforms, sizeof(uniforms));
+    if (hasCamera) {
+        FrameUniforms uniforms = {};
+        uniforms.viewProj = viewProj;
+        SDL_PushGPUVertexUniformData(cmd, 0, &uniforms, sizeof(uniforms));
+    }
 
     SDL_GPUColorTargetInfo colorTarget = {};
     colorTarget.texture = swapchainTexture;

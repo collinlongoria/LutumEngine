@@ -12,10 +12,18 @@
 
 #ifndef LUTUM_WINDOW_HPP
 #define LUTUM_WINDOW_HPP
+#include <cstdint>
 
 struct SDL_Window;
 
 namespace Lutum {
+
+// Resource: written by Application each frame, read by systems
+struct WindowInfo {
+    uint32_t drawableWidth = 0;
+    uint32_t drawableHeight = 0;
+};
+
 class Window {
 public:
     Window(const char* title, int width, int height);

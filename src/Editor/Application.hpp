@@ -15,10 +15,8 @@
 
 #include <memory>
 
-#include "Lutum/Core/Time.hpp"
-#include "Lutum/Platform/Input.hpp"
-#include "Lutum/Graphics/Camera.hpp"
-#include "Lutum/Graphics/FlyCameraController.hpp"
+#include "Lutum/ECS/Registry.hpp"
+#include "Lutum/ECS/Scheduler.hpp"
 
 namespace Lutum {
 
@@ -45,10 +43,8 @@ private:
     std::unique_ptr<Lutum::GraphicsDevice> m_graphicsDevice;
     std::unique_ptr<Lutum::Renderer> m_renderer;
 
-    Time m_time;
-    Input m_input;
-    Camera m_camera;
-    FlyCameraController m_cameraController;
+    Curia::Registry m_registry;
+    Curia::Scheduler m_scheduler{m_registry};
 
     bool m_shutdown = false;
 };

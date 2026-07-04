@@ -16,10 +16,13 @@
 
 #include "Lutum/Graphics/Buffer.hpp"
 #include "Lutum/Graphics/GraphicsPipeline.hpp"
-#include "Lutum/Graphics/Camera.hpp"
+#include "Lutum/ECS/Query.hpp"
+#include "Lutum/Scene/Camera.hpp"
+#include "Lutum/Scene/Transform.hpp"
 
 namespace Lutum {
 
+namespace Curia { class Registry; }
 class GraphicsDevice;
 class ShaderCompiler;
 class Shader;
@@ -33,7 +36,7 @@ public:
     Renderer& operator=(const Renderer&) = delete;
 
     bool Initialize();
-    void RenderFrame(const Camera& camera);
+    void RenderFrame(Curia::Registry& registry);
     void Shutdown();
 
 private:
@@ -44,6 +47,7 @@ private:
     std::unique_ptr<ShaderCompiler> m_shaderCompiler;
     GraphicsPipeline m_trianglePipeline;
     Buffer m_triangleVBO;
+    Curia::Query<Transform, CameraComponent, Curia::With<ActiveCamera>> m_cameraQuery;
 };
 } // Lutum
 

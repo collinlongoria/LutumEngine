@@ -23,6 +23,14 @@ Registry::Registry() {
     m_archetypes.push_back(std::move(empty));
 }
 
+Registry::~Registry() {
+    // Reverse registration order, in case resources reference each other
+    for (auto it = m_resources.rbegin(); it != m_resources.rend(); ++it) {
+        if (it->ptr)
+            it->destroy(it->ptr);
+    }
+}
+
 Entity Registry::Create() {
     LUTUM_ASSERT(!m_inObserver, "structural change from inside an observer");
 

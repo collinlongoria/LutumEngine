@@ -76,10 +76,6 @@ add_library(LutumEngine STATIC
         src/Lutum/Core/Time.hpp
         src/Lutum/Platform/Input.cpp
         src/Lutum/Platform/Input.hpp
-        src/Lutum/Graphics/Camera.cpp
-        src/Lutum/Graphics/Camera.hpp
-        src/Lutum/Graphics/FlyCameraController.cpp
-        src/Lutum/Graphics/FlyCameraController.hpp
         src/Lutum/Core/Log.cpp
         src/Lutum/Core/Log.hpp
         src/Lutum/Core/Jobs.cpp
@@ -119,6 +115,10 @@ add_executable(LutumEditor
         src/Editor/main.cpp
         src/Editor/Application.cpp
         src/Editor/Application.hpp
+        src/Lutum/Scene/Transform.hpp
+        src/Lutum/Scene/Camera.hpp
+        src/Lutum/Scene/CameraSystems.cpp
+        src/Lutum/Scene/CameraSystems.hpp
 )
 
 target_include_directories(LutumEditor PRIVATE

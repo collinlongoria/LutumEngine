@@ -22,12 +22,14 @@
 #include "Lutum/ECS/Archetype.hpp"
 #include "Lutum/ECS/Component.hpp"
 #include "Lutum/ECS/Entity.hpp"
+#include "Lutum/ECS/Resource.hpp"
 
 namespace Lutum::Curia {
 
 class Registry {
 public:
     Registry();
+    ~Registry();
 
     Registry(const Registry&) = delete;
     Registry& operator=(const Registry&) = delete;
@@ -86,6 +88,40 @@ public:
     [[nodiscard]]
     const std::vector<std::unique_ptr<Archetype>>& Archetypes() const { return m_archetypes; }
 
+    // --- Resources ---
+
+    template<typename T, typename... Args>
+    T& SetResource(Args&&... args) {
+        const ResourceID id = ResourceType<T>::Id();
+        if (id >= m_resources.size())
+            m_resources.resize(id + 1);
+
+        ResourceSlot& slot = m_resources[id];
+        if (slot.ptr)
+            slot.destroy(slot.ptr);
+
+        slot.ptr = new T(std::forward<Args>(args)...);
+        slot.destroy = [](void* p) { delete static_cast<T*>(p); };
+        return *static_cast<T*>(slot.ptr);
+    }
+
+    template<typename T>
+    [[nodiscard]]
+    T* TryGetResource() {
+        const ResourceID id = ResourceType<T>::Id();
+        if (id >= m_resources.size() || !m_resources[id].ptr)
+            return nullptr;
+        return static_cast<T*>(m_resources[id].ptr);
+    }
+
+    template<typename T>
+    [[nodiscard]]
+    T& GetResource() {
+        T* resource = TryGetResource<T>();
+        LUTUM_ASSERT(resource != nullptr, "missing resource");
+        return *resource;
+    }
+
 private:
     struct EntityRecord {
         Archetype* archetype = nullptr;
@@ -110,6 +146,12 @@ private:
     std::vector<std::vector<std::function<void(Entity)>>> m_onRemove;
 
     bool m_inObserver = false;
+
+    struct ResourceSlot {
+        void* ptr = nullptr;
+        void (*destroy)(void*) = nullptr;
+    };
+    std::vector<ResourceSlot> m_resources;
 };
 
 // --- Template impls ---
