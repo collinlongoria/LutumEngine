@@ -1,4 +1,4 @@
-<p>
+<p style="text-align: center;">
   <img src="public/Banner.png" alt="Lutum Engine banner" width="728">
 </p>
 
