@@ -70,6 +70,8 @@ add_library(LutumEngine STATIC
         src/Lutum/Graphics/FlyCameraController.hpp
         src/Lutum/Core/Log.cpp
         src/Lutum/Core/Log.hpp
+        src/Lutum/Core/Jobs.cpp
+        src/Lutum/Core/Jobs.hpp
 )
 
 target_include_directories(LutumEngine PUBLIC

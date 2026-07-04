@@ -12,6 +12,10 @@
 
 #include "Editor/Application.hpp"
 
+#include <chrono>
+#include <thread>
+
+#include "Lutum/Core/Jobs.hpp"
 #include "Lutum/Core/Log.hpp"
 #include "Lutum/Platform/PlatformContext.hpp"
 #include "Lutum/Platform/Window.hpp"
@@ -23,6 +27,9 @@ Application::Application() = default;
 Application::~Application() = default;
 
 bool Application::Initialize() {
+    Log::Initialize();
+    Jobs::Initialize();
+
     m_platform = std::make_unique<Lutum::PlatformContext>();
     if (!m_platform->IsValid())
         return false;
@@ -50,12 +57,29 @@ bool Application::Initialize() {
     );
     m_input.SetRelativeMouseMode(*m_window, true);
 
-    Lutum::Log::Initialize();
-
     return true;
 }
 
 void Application::Run() {
+    // Jobs Test
+    std::atomic<uint64_t> sum{0};
+    Lutum::Jobs::ParallelFor(1'000'000, 0, [&sum](uint32_t begin, uint32_t end) {
+        uint64_t local = 0;
+        for (uint32_t i = begin; i < end; ++i) local += i;
+        sum += local;
+    });
+    LUTUM_INFO("ParallelFor sum: {} (expect 499999500000)", sum.load());
+
+    // Nested wait: job that spawns jobs and waits. must not deadlock
+    Lutum::JobCounter outer;
+    Lutum::Jobs::Execute([] {
+        Lutum::Jobs::ParallelFor(100, 10, [](uint32_t, uint32_t) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        });
+    }, &outer);
+    Lutum::Jobs::Wait(outer);
+    LUTUM_INFO("Nested wait OK");
+
     while (!m_window->ShouldClose()) {
         m_time.Tick();
         m_window->PollEvents();
@@ -83,6 +107,7 @@ void Application::Terminate() {
     m_graphicsDevice.reset();
     m_window.reset();
 
-    Lutum::Log::Shutdown();
+    Jobs::Shutdown();
+    Log::Shutdown();
 }
 } // Lutum
