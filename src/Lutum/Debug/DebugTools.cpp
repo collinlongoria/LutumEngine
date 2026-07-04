@@ -1,5 +1,5 @@
 /*
-* File: Debug.cpp
+* File: DebugTools.cpp
 * Project: LutumEngine
 * Author: Collin
 * Created on: 7/3/2026
@@ -10,7 +10,7 @@
 * https://opensource.org/licenses/MIT
 */
 
-#include "Lutum/Core/Debug.hpp"
+#include "Lutum/Debug/DebugTools.hpp"
 
 #include <chrono>
 #include <thread>

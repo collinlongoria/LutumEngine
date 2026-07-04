@@ -69,11 +69,6 @@ target_include_directories(imgui PUBLIC
 )
 target_link_libraries(imgui PUBLIC SDL3::SDL3)
 
-if (LUTUM_ENABLE_DEBUG_UI)
-    target_link_libraries(LutumEngine PUBLIC imgui)
-    target_compile_definitions(LutumEngine PUBLIC LUTUM_ENABLE_DEBUG_UI=1)
-endif()
-
 # =========================
 # Engine library
 # =========================
@@ -109,8 +104,8 @@ add_library(LutumEngine STATIC
         src/Lutum/ECS/Entity.hpp
         src/Lutum/ECS/Component.hpp
         src/Lutum/ECS/Component.cpp
-        src/Lutum/Core/Debug.hpp
-        src/Lutum/Core/Debug.cpp
+        src/Lutum/Debug/DebugTools.hpp
+        src/Lutum/Debug/DebugTools.cpp
         src/Lutum/ECS/Slab.hpp
         src/Lutum/ECS/Archetype.hpp
         src/Lutum/ECS/Archetype.cpp
@@ -134,6 +129,11 @@ target_link_libraries(LutumEngine PUBLIC
         SDL3_shadercross::SDL3_shadercross
         glm::glm
 )
+
+if (LUTUM_ENABLE_DEBUG_UI)
+    target_link_libraries(LutumEngine PUBLIC imgui)
+    target_compile_definitions(LutumEngine PUBLIC LUTUM_ENABLE_DEBUG_UI=1)
+endif()
 
 # =========================
 # Editor executable

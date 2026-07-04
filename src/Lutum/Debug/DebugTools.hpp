@@ -1,5 +1,5 @@
 /*
-* File: Debug.hpp
+* File: DebugTools.hpp
 * Project: LutumEngine
 * Author: Collin
 * Created on: 7/3/2026
@@ -10,8 +10,8 @@
 * https://opensource.org/licenses/MIT
 */
 
-#ifndef LUTUM_DEBUG_HPP
-#define LUTUM_DEBUG_HPP
+#ifndef LUTUM_DEBUGTOOLS_HPP
+#define LUTUM_DEBUGTOOLS_HPP
 #include <cstdint>
 
 namespace Lutum::Debug {
@@ -19,4 +19,4 @@ namespace Lutum::Debug {
     void SleepMilliseconds(uint32_t milliseconds);
 }
 
-#endif //LUTUM_DEBUG_HPP
+#endif //LUTUM_DEBUGTOOLS_HPP

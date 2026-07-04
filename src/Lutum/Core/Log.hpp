@@ -18,7 +18,7 @@
 #include <string_view>
 #include <utility>
 
-#include "Lutum/Core/Debug.hpp"
+#include "../Debug/DebugTools.hpp"
 
 // Compile-time floor
 // 0=Trace 1=Debug 2=Info 3=Warn 4=Error 5=Fatal
