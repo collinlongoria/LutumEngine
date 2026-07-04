@@ -81,6 +81,17 @@ bool Renderer::Initialize() {
     if (!m_shaderCompiler->Initialize())
         return false;
 
+    RenderTarget::CreateInfo targetInfo = {};
+    targetInfo.width = static_cast<uint32_t>(m_device->GetWindow().DrawableWidth());
+    targetInfo.height = static_cast<uint32_t>(m_device->GetWindow().DrawableHeight());
+    targetInfo.offscreen = false;
+    targetInfo.hasDepth = true;
+
+    std::optional<RenderTarget> target = RenderTarget::Create(*m_device, targetInfo);
+    if (!target)
+        return false;
+    m_sceneTarget = std::move(*target);
+
     std::optional<Shader> vert = m_shaderCompiler->LoadHLSL(*m_device, kVertexHLSL, ShaderStage::VERTEX);
     std::optional<Shader> frag = m_shaderCompiler->LoadHLSL(*m_device, kFragmentHLSL, ShaderStage::FRAGMENT);
     if (!vert || !frag)
@@ -95,6 +106,11 @@ bool Renderer::Initialize() {
             { 0, VertexFormat::FLOAT3, offsetof(Vertex, position) },
             { 1, VertexFormat::FLOAT3, offsetof(Vertex, color) },
         };
+    pipelineInfo.depthState.testEnabled = true;
+    pipelineInfo.depthState.writeEnabled = true;
+    pipelineInfo.depthState.compareOp = CompareOp::LESS;
+    pipelineInfo.colorFormat = m_sceneTarget.NativeColorFormat();
+    pipelineInfo.depthFormat = m_sceneTarget.NativeDepthFormat();
 
     std::optional<GraphicsPipeline> pipeline = GraphicsPipeline::Create(*m_device, pipelineInfo);
     if (!pipeline)
@@ -103,10 +119,11 @@ bool Renderer::Initialize() {
     m_trianglePipeline = std::move(*pipeline);
 
     // Vertex buffer
+    // Red triangle NEARER (z=0.0) but drawn FIRST; blue FARTHER (z=0.5) drawn second
+    // Without depth testing blue would overwrite red in the overlap
     const Vertex vertices[] = {
-        {{ 0.0f,  0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-        {{ 0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-        {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{-0.6f, -0.4f, 0.0f}, {1, 0, 0}}, {{ 0.2f, -0.4f, 0.0f}, {1, 0, 0}}, {{-0.2f, 0.5f, 0.0f}, {1, 0, 0}},
+        {{-0.2f, -0.4f, 0.5f}, {0, 0, 1}}, {{ 0.6f, -0.4f, 0.5f}, {0, 0, 1}}, {{ 0.2f, 0.5f, 0.5f}, {0, 0, 1}},
     };
 
     std::optional<Buffer> vbo = Buffer::Create(*m_device, BufferUsage::VERTEX, sizeof(vertices), "triangle_vbo");
@@ -143,6 +160,12 @@ void Renderer::RenderFrame(Curia::Registry& registry) {
         }
     });
 
+    const uint32_t drawableW = static_cast<uint32_t>(m_device->GetWindow().DrawableWidth());
+    const uint32_t drawableH = static_cast<uint32_t>(m_device->GetWindow().DrawableHeight());
+    if (drawableW == 0 || drawableH == 0)
+        return;
+    m_sceneTarget.Resize(drawableW, drawableH);
+
     SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(m_device->NativeHandle());
     if (!cmd) {
         SDL_Log("SDL_AcquireGPUCommandBuffer failed: %s", SDL_GetError());
@@ -176,13 +199,11 @@ void Renderer::RenderFrame(Curia::Registry& registry) {
         SDL_PushGPUVertexUniformData(cmd, 0, &uniforms, sizeof(uniforms));
     }
 
-    SDL_GPUColorTargetInfo colorTarget = {};
-    colorTarget.texture = swapchainTexture;
-    colorTarget.clear_color = SDL_FColor{0.08f, 0.08f, 0.10f, 1.0f};
-    colorTarget.load_op = SDL_GPU_LOADOP_CLEAR;
-    colorTarget.store_op = SDL_GPU_STOREOP_STORE;
-
-    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &colorTarget, 1, nullptr);
+    SDL_GPURenderPass* pass = m_sceneTarget.BeginRenderPass(cmd, swapchainTexture, Vec4(0.08f, 0.08f, 0.10f, 1.0f));
+    if (!pass) {
+        SDL_SubmitGPUCommandBuffer(cmd);
+        return;
+    }
 
     SDL_BindGPUGraphicsPipeline(pass, m_trianglePipeline.NativeHandle());
 
@@ -191,7 +212,7 @@ void Renderer::RenderFrame(Curia::Registry& registry) {
     vertexBinding.offset = 0;
     SDL_BindGPUVertexBuffers(pass, 0, &vertexBinding, 1);
 
-    SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+    SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0);
 
     SDL_EndGPURenderPass(pass);
 

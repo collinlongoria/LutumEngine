@@ -12,6 +12,9 @@
 
 #include "Lutum/Core/Debug.hpp"
 
+#include <chrono>
+#include <thread>
+
 #if defined(_MSC_VER)
     #include <intrin.h>
 #elif defined(__GNUC__) || defined(__clang__)
@@ -28,6 +31,10 @@ void Break() {
 #else
     std::abort();
 #endif
+}
+
+void SleepMilliseconds(uint32_t milliseconds) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 }
 
 }

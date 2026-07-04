@@ -95,6 +95,8 @@ add_library(LutumEngine STATIC
         src/Lutum/ECS/Resource.hpp
         src/Lutum/ECS/Scheduler.hpp
         src/Lutum/ECS/Scheduler.cpp
+        src/Lutum/Graphics/RenderTarget.cpp
+        src/Lutum/Graphics/RenderTarget.hpp
 )
 
 target_include_directories(LutumEngine PUBLIC

@@ -44,6 +44,14 @@ void Window::PollEvents() {
                 m_shouldClose = true;
                 break;
 
+            case SDL_EVENT_WINDOW_MINIMIZED:
+                m_minimized = true;
+                break;
+
+            case SDL_EVENT_WINDOW_RESTORED:
+                m_minimized = false;
+                break;
+
             default:
                 break;
         }

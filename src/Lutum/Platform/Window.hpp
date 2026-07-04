@@ -47,9 +47,12 @@ public:
     int DrawableWidth() const;
     [[nodiscard]]
     int DrawableHeight() const;
+    [[nodiscard]]
+    bool IsMinimized() const { return m_minimized; }
 
 private:
     SDL_Window *m_window = nullptr;
+    bool m_minimized = false;
     bool m_shouldClose = false;
 };
 } // Lutum

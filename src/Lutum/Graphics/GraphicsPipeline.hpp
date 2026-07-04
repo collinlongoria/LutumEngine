@@ -51,13 +51,36 @@ struct VertexLayout {
     std::vector<VertexAttribute> attributes;
 };
 
+enum class CompareOp {
+    NEVER,
+    LESS,
+    EQUAL,
+    LESS_OR_EQUAL,
+    GREATER,
+    NOT_EQUAL,
+    GREATER_OR_EQUAL,
+    ALWAYS
+};
+
+struct DepthState {
+    bool testEnabled = false;
+    bool writeEnabled = false;
+    CompareOp compareOp = CompareOp::LESS;
+};
+
 class GraphicsPipeline {
 public:
     struct CreateInfo {
         Shader* vertexShader = nullptr;
         Shader* fragmentShader = nullptr;
         PrimitiveType primitiveType = PrimitiveType::TRIANGLE_LIST;
-        // TODO: color target format is currently pulled from swapchain
+
+        DepthState depthState;
+        // Formats of the RenderTarget this pipeline will draw into
+        // 0 for depthFormat means no depth attachment
+        //      Pass the target's NativeColorFormat()/NativeDepthFormat()
+        uint32_t colorFormat = 0; // 0 = swapchain format
+        uint32_t depthFormat = 0;
 
         // TODO: currently only supports a single vertex buffer at slot 0
         VertexLayout vertexLayout;

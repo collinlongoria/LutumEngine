@@ -19,6 +19,7 @@
 #include "Lutum/ECS/Query.hpp"
 #include "Lutum/Scene/Camera.hpp"
 #include "Lutum/Scene/Transform.hpp"
+#include "Lutum/Graphics/RenderTarget.hpp"
 
 namespace Lutum {
 
@@ -45,8 +46,11 @@ private:
     bool m_initialized = false;
 
     std::unique_ptr<ShaderCompiler> m_shaderCompiler;
+
     GraphicsPipeline m_trianglePipeline;
     Buffer m_triangleVBO;
+    RenderTarget m_sceneTarget;
+
     Curia::Query<Transform, CameraComponent, Curia::With<ActiveCamera>> m_cameraQuery;
 };
 } // Lutum

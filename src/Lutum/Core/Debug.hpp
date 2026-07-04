@@ -12,9 +12,11 @@
 
 #ifndef LUTUM_DEBUG_HPP
 #define LUTUM_DEBUG_HPP
+#include <cstdint>
 
 namespace Lutum::Debug {
     void Break();
+    void SleepMilliseconds(uint32_t milliseconds);
 }
 
 #endif //LUTUM_DEBUG_HPP

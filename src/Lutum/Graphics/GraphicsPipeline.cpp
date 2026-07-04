@@ -16,6 +16,7 @@
 #include <SDL3/SDL_assert.h>
 #include <SDL3/SDL_log.h>
 
+#include "Lutum/Core/Log.hpp"
 #include "Lutum/Graphics/GraphicsDevice.hpp"
 #include "Lutum/Graphics/Shader.hpp"
 #include "Lutum/Platform/Window.hpp"
@@ -61,6 +62,22 @@ static SDL_GPUVertexElementFormat ToSDLVertexFormat(VertexFormat format) {
     return SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
 }
 
+static SDL_GPUCompareOp ToSDLCompareOp(CompareOp op) {
+    switch (op) {
+        case CompareOp::NEVER:            return SDL_GPU_COMPAREOP_NEVER;
+        case CompareOp::LESS:             return SDL_GPU_COMPAREOP_LESS;
+        case CompareOp::EQUAL:            return SDL_GPU_COMPAREOP_EQUAL;
+        case CompareOp::LESS_OR_EQUAL:    return SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+        case CompareOp::GREATER:          return SDL_GPU_COMPAREOP_GREATER;
+        case CompareOp::NOT_EQUAL:        return SDL_GPU_COMPAREOP_NOT_EQUAL;
+        case CompareOp::GREATER_OR_EQUAL: return SDL_GPU_COMPAREOP_GREATER_OR_EQUAL;
+        case CompareOp::ALWAYS:           return SDL_GPU_COMPAREOP_ALWAYS;
+    }
+
+    SDL_assert(false);
+    return SDL_GPU_COMPAREOP_LESS;
+}
+
 GraphicsPipeline::GraphicsPipeline(GraphicsDevice &device, SDL_GPUGraphicsPipeline *pipeline)
     : m_device(&device), m_pipeline(pipeline)
 {
@@ -95,10 +112,7 @@ std::optional<GraphicsPipeline> GraphicsPipeline::Create(GraphicsDevice &device,
     }
 
     SDL_GPUColorTargetDescription colorTargetDesc = {};
-    colorTargetDesc.format = SDL_GetGPUSwapchainTextureFormat(
-        device.NativeHandle(),
-        device.GetWindow().NativeHandle()
-    );
+    colorTargetDesc.format = (info.colorFormat != 0) ? static_cast<SDL_GPUTextureFormat>(info.colorFormat) : SDL_GetGPUSwapchainTextureFormat(device.NativeHandle(), device.GetWindow().NativeHandle());
 
     SDL_GPUGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.vertex_shader = info.vertexShader->NativeHandle();
@@ -106,6 +120,17 @@ std::optional<GraphicsPipeline> GraphicsPipeline::Create(GraphicsDevice &device,
     pipelineInfo.primitive_type = ToSDLPrimitive(info.primitiveType);
     pipelineInfo.target_info.num_color_targets = 1;
     pipelineInfo.target_info.color_target_descriptions = &colorTargetDesc;
+
+    if (info.depthState.testEnabled || info.depthState.writeEnabled) {
+        LUTUM_ASSERT(info.depthFormat != 0, "pipeline has depth state but no depth format; pass the target's NativeDepthFormat()");
+
+        pipelineInfo.depth_stencil_state.enable_depth_test = info.depthState.testEnabled;
+        pipelineInfo.depth_stencil_state.enable_depth_write = info.depthState.writeEnabled;
+        pipelineInfo.depth_stencil_state.compare_op = ToSDLCompareOp(info.depthState.compareOp);
+
+        pipelineInfo.target_info.has_depth_stencil_target = true;
+        pipelineInfo.target_info.depth_stencil_format = static_cast<SDL_GPUTextureFormat>(info.depthFormat);
+    }
 
     // Vertex input (single buffer, slot 0)
     SDL_GPUVertexBufferDescription bufferDesc = {};

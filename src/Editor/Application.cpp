@@ -82,6 +82,11 @@ void Application::Run() {
         m_registry.GetResource<Time>().Tick();
         m_window->PollEvents();
 
+        if (m_window->IsMinimized()) {
+            Debug::SleepMilliseconds(10);
+            continue;
+        }
+
         Input& input = m_registry.GetResource<Input>();
         input.Update();
 
