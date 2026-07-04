@@ -84,6 +84,16 @@ add_library(LutumEngine STATIC
         src/Lutum/Core/Log.hpp
         src/Lutum/Core/Jobs.cpp
         src/Lutum/Core/Jobs.hpp
+        src/Lutum/ECS/Entity.hpp
+        src/Lutum/ECS/Component.hpp
+        src/Lutum/ECS/Component.cpp
+        src/Lutum/Core/Debug.hpp
+        src/Lutum/Core/Debug.cpp
+        src/Lutum/ECS/Slab.hpp
+        src/Lutum/ECS/Archetype.hpp
+        src/Lutum/ECS/Archetype.cpp
+        src/Lutum/ECS/Registry.hpp
+        src/Lutum/ECS/Registry.cpp
 )
 
 target_include_directories(LutumEngine PUBLIC

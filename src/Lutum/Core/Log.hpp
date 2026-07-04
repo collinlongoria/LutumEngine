@@ -18,6 +18,8 @@
 #include <string_view>
 #include <utility>
 
+#include "Lutum/Core/Debug.hpp"
+
 // Compile-time floor
 // 0=Trace 1=Debug 2=Info 3=Warn 4=Error 5=Fatal
 #ifndef LUTUM_LOG_MIN_LEVEL
@@ -91,7 +93,7 @@ namespace Log {
         do {                                                                         \
             if (!(condition)) {                                                      \
                 LUTUM_FATAL("Assert failed: (" #condition ") " __VA_ARGS__);         \
-                SDL_TriggerBreakpoint();                                             \
+                ::Lutum::Debug::Break();                                         \
             }                                                                        \
         } while (0)
 #else
