@@ -23,6 +23,8 @@ namespace Lutum {
 // Resource: describes the surface the scene camera renders to
 // In the editor the viewport panel writes it; in a game runtime the window does
 struct ViewportInfo {
+    static constexpr const char* kCuriaName = "ViewportInfo";
+    
     uint32_t width = 0;
     uint32_t height = 0;
     bool hovered = false;

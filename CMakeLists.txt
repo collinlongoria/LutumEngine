@@ -116,6 +116,7 @@ add_library(LutumCore STATIC
         src/Lutum/ECS/Scheduler.hpp
         src/Lutum/Core/FileSystem.cpp
         src/Lutum/Core/FileSystem.hpp
+        src/Lutum/ECS/Resource.cpp
 )
 target_include_directories(LutumCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(LutumCore PUBLIC

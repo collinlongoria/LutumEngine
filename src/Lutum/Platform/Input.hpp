@@ -41,6 +41,8 @@ enum class MouseButton {
 
 class Input {
 public:
+    static constexpr const char* kCuriaName = "Input";
+
     Input() = default;
 
     Input(const Input&) = delete;

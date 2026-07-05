@@ -27,30 +27,40 @@ namespace {
 using namespace Lutum::Curia;
 
 struct Position {
+    static constexpr const char* kCuriaName = "Test.Position";
     float x, y, z;
 };
 
 struct Velocity {
+    static constexpr const char* kCuriaName = "Test.Velocity";
     float x, y, z;
 };
 
 struct Lifetime {
+    static constexpr const char* kCuriaName = "Test.Lifetime";
     float seconds;
 };
 
 struct AlignedThing {
+    static constexpr const char* kCuriaName = "Test.AlignedThing";
     alignas(16) float v[4];
 };
 
 struct Small {
+    static constexpr const char* kCuriaName = "Test.Small";
     uint8_t b;
 };
 
-struct DeadTag {};
+struct DeadTag {
+    static constexpr const char* kCuriaName = "Test.DeadTag";
+};
 
-struct Frozen {};
+struct Frozen {
+    static constexpr const char* kCuriaName = "Test.Frozen";
+};
 
 struct MeshHandle {
+    static constexpr const char* kCuriaName = "Test.MeshHandle";
     uint32_t id;
 };
 
@@ -340,4 +350,36 @@ TEST_CASE_FIXTURE(CuriaJobsFixture, "Curia Scheduler phases systems by dependenc
     CHECK(lifetimeRuns == 120);
     CHECK(dampingRuns == 120);
     CHECK(postDampingRuns == 120);
+}
+
+TEST_CASE("stable keys: idempotent registration and lookup") {
+    const ComponentID a = ComponentType<Position>::Id();
+    CHECK(ComponentType<Position>::Id() == a);
+
+    // Key is compile-time and matches the declared name
+    static_assert(ComponentType<Position>::Key() == HashName("Test.Position"));
+
+    // Direct re-register by key is idempotent
+    CHECK(ComponentRegistry::Register(HashName("Test.Position"), "Test.Position",
+                                      sizeof(Position), alignof(Position)) == a);
+
+    // Lookup by key
+    const auto found = ComponentRegistry::FindByKey(HashName("Test.Position"));
+    REQUIRE(found.has_value());
+    CHECK(*found == a);
+    CHECK(ComponentRegistry::Get(a).name == "Test.Position");
+    CHECK(ComponentRegistry::Get(a).size == sizeof(Position));
+    CHECK(ComponentRegistry::Get(a).key == HashName("Test.Position"));
+
+    // Unknown keys are tolerated, not fatal — the loader depends on this
+    CHECK_FALSE(ComponentRegistry::FindByKey(HashName("Test.DoesNotExist")).has_value());
+
+    // Tags register with zero size
+    const ComponentID tag = ComponentType<DeadTag>::Id();
+    CHECK(ComponentRegistry::Get(tag).size == 0);
+
+    // Resources: same mechanism
+    const ResourceID r = ResourceType<Position>::Id(); // any named class works
+    CHECK(ResourceType<Position>::Id() == r);
+    CHECK(ResourceRegistry::Name(r) == "Test.Position");
 }

@@ -18,6 +18,8 @@
 namespace Lutum {
 
 struct CameraComponent {
+    static constexpr const char* kCuriaName = "CameraComponent";
+
     float fovY = 1.0471975512f; // 60 degrees
     float aspect = 16.0f / 9.0f; // overwritten each frame from WindowInfo
     float nearPlane = 0.1f;
@@ -25,11 +27,14 @@ struct CameraComponent {
 };
 
 // Tag: marks the camera the renderer uses
-// Keep it on exactly one entity
-struct ActiveCamera {};
+struct ActiveCamera {
+    static constexpr const char* kCuriaName = "ActiveCamera";
+};
 
 // Fly controller state + tuning
 struct FlyCam {
+    static constexpr const char* kCuriaName = "FlyCam";
+
     float yaw = 0.0f; // radians; 0 faces -Z
     float pitch = 0.0f;
     float moveSpeed = 5.0f;

@@ -16,27 +16,34 @@
 #include <cstdint>
 #include <type_traits>
 
+#include "Lutum/ECS/Component.hpp"
+
 namespace Lutum::Curia {
 
 using ResourceID = uint32_t;
 
-namespace detail {
-    inline std::atomic<ResourceID> s_resourceCounter{0};
-}
+namespace ResourceRegistry {
+    // NOTE: re-registering an existing key returns its ID
+    ResourceID Register(StableKey key, const char* name);
+    [[nodiscard]]
+    const std::string& Name(ResourceID id);
+    [[nodiscard]]
+    uint32_t Count();
+} // ResourceRegistry
 
-// Resources are registry-singletons
-// Storage lives on the Registry
-// this header only provides stable runtime IDs so the Scheduler can include resource access in conflict analysis.
-//
-// TODO: same first-touch runtime ID caveat as ComponentType. See Component.hpp.
-template <typename T>
-    requires std::is_class_v<T>
+// NOTE: resources declare identity the same way components do
+template<typename T>
+    requires std::is_class_v<T> && HasStableName<T>
 struct ResourceType {
     static ResourceID Id() {
-        static const ResourceID id = detail::s_resourceCounter.fetch_add(1, std::memory_order_relaxed);
+        static const ResourceID id = ResourceRegistry::Register(HashName(T::kCuriaName), T::kCuriaName);
         return id;
     }
+
+    [[nodiscard]]
+    static constexpr StableKey Key() { return HashName(T::kCuriaName); }
 };
+
 } // Lutum::Curia
 
 #endif //LUTUM_CURIA_RESOURCE_HPP

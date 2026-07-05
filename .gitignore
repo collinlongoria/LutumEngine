@@ -79,3 +79,5 @@ out/
 
 # Local dev project
 LutumProject/
+Lutum.log
+imgui.ini

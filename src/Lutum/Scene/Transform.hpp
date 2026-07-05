@@ -17,6 +17,8 @@
 namespace Lutum {
 
 struct Transform {
+    static constexpr const char* kCuriaName = "Transform";
+
     Vec3 position = Vec3(0.0f);
     Quat rotation = Quat(1.0f, 0.0f, 0.0f, 0.0f);
     Vec3 scale = Vec3(1.0f);

@@ -17,6 +17,8 @@
 namespace Lutum {
 class Time {
 public:
+    static constexpr const char* kCuriaName = "Time";
+    
     Time();
 
     // Called once per frame, at the top of the game loop
