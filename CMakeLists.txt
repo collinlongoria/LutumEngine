@@ -97,7 +97,7 @@ add_library(LutumCore STATIC
         src/Lutum/Core/Log.hpp
         src/Lutum/Core/Jobs.cpp
         src/Lutum/Core/Jobs.hpp
-        
+
         src/Lutum/Debug/DebugTools.cpp
         src/Lutum/Debug/DebugTools.hpp
 
@@ -114,6 +114,8 @@ add_library(LutumCore STATIC
         src/Lutum/ECS/Resource.hpp
         src/Lutum/ECS/Scheduler.cpp
         src/Lutum/ECS/Scheduler.hpp
+        src/Lutum/Core/FileSystem.cpp
+        src/Lutum/Core/FileSystem.hpp
 )
 target_include_directories(LutumCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(LutumCore PUBLIC
@@ -156,10 +158,14 @@ if(LUTUM_ENABLE_RENDERER)
             src/Lutum/Graphics/GraphicsPipeline.hpp
             src/Lutum/Graphics/Buffer.cpp
             src/Lutum/Graphics/Buffer.hpp
-            src/Lutum/Graphics/BufferUploader.cpp
-            src/Lutum/Graphics/BufferUploader.hpp
+            src/Lutum/Graphics/GpuUploader.cpp
+            src/Lutum/Graphics/GpuUploader.hpp
             src/Lutum/Graphics/RenderTarget.cpp
             src/Lutum/Graphics/RenderTarget.hpp
+            src/Lutum/Graphics/ImageIO.cpp
+            src/Lutum/Graphics/ImageIO.hpp
+            src/Lutum/Graphics/Texture.cpp
+            src/Lutum/Graphics/Texture.hpp
     )
 
     if(LUTUM_ENABLE_DEBUG_UI)

@@ -14,8 +14,10 @@
 
 #include <SDL3/SDL_gpu.h>
 
+#include "ImageIO.hpp"
+#include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Debug/DebugUI.hpp"
-#include "Lutum/Graphics/BufferUploader.hpp"
+#include "Lutum/Graphics/GpuUploader.hpp"
 #include "Lutum/Graphics/GraphicsDevice.hpp"
 #include "Lutum/Graphics/Shader.hpp"
 #include "Lutum/Graphics/ShaderCompiler.hpp"
@@ -27,45 +29,6 @@ namespace Lutum {
 struct FrameUniforms {
     Mat4 viewProj;
 };
-
-// TODO: move to asset files once there's a filesystem layer
-// NOTE: SDL_shadercross requires TEXCOORDn semantics for vertex inputs.
-// TEXCOORD0 -> attribute location 0, TEXCOORD1 -> location 1, etc.
-// NOTE: SDL_GPU convention via shadercross: vertex uniform buffers live in space1.
-// (Fragment uniforms would be space3.) register(b0, space1) -> uniform slot 0.
-static const char* kVertexHLSL = R"(
-cbuffer FrameUniforms : register(b0, space1) {
-    float4x4 viewProj;
-};
-
-struct VSInput {
-    float3 position : TEXCOORD0;
-    float3 color    : TEXCOORD1;
-};
-
-struct VSOutput {
-    float4 position : SV_Position;
-    float3 color    : TEXCOORD0;
-};
-
-VSOutput main(VSInput input) {
-    VSOutput o;
-    o.position = mul(viewProj, float4(input.position, 1.0));
-    o.color = input.color;
-    return o;
-}
-)";
-
-static const char* kFragmentHLSL = R"(
-struct PSInput {
-    float4 position : SV_Position;
-    float3 color    : TEXCOORD0;
-};
-
-float4 main(PSInput input) : SV_Target0 {
-    return float4(input.color, 1.0);
-}
-)";
 
 struct Vertex {
     float position[3];
@@ -82,8 +45,15 @@ bool Renderer::Initialize(const RenderTarget& sceneTarget) {
     if (!m_shaderCompiler->Initialize())
         return false;
 
-    std::optional<Shader> vert = m_shaderCompiler->LoadHLSL(*m_device, kVertexHLSL, ShaderStage::VERTEX);
-    std::optional<Shader> frag = m_shaderCompiler->LoadHLSL(*m_device, kFragmentHLSL, ShaderStage::FRAGMENT);
+    auto vertSource = FileSystem::ReadText("/Engine/shaders/basic.vert.hlsl");
+    auto fragSource = FileSystem::ReadText("/Engine/shaders/basic.frag.hlsl");
+    if (!vertSource || !fragSource) {
+        LUTUM_ERROR("Renderer: engine shaders missing");
+        return false;
+    }
+
+    std::optional<Shader> vert = m_shaderCompiler->LoadHLSL(*m_device, vertSource->c_str(), ShaderStage::VERTEX);
+    std::optional<Shader> frag = m_shaderCompiler->LoadHLSL(*m_device, fragSource->c_str(), ShaderStage::FRAGMENT);
     if (!vert || !frag)
         return false;
 
@@ -109,24 +79,73 @@ bool Renderer::Initialize(const RenderTarget& sceneTarget) {
 
     m_placeholderPipeline = std::move(*pipeline);
 
-    // Vertex buffer
+    // Vertex & Index buffer
     const Vertex vertices[] = {
-        {{-0.6f, -0.4f, 0.0f}, {1, 0, 0}}, {{ 0.2f, -0.4f, 0.0f}, {1, 0, 0}}, {{-0.2f, 0.5f, 0.0f}, {1, 0, 0}},
-        {{-0.2f, -0.4f, 0.5f}, {0, 0, 1}}, {{ 0.6f, -0.4f, 0.5f}, {0, 0, 1}}, {{ 0.2f, 0.5f, 0.5f}, {0, 0, 1}},
+        // +Z front
+        {{-0.5f,-0.5f, 0.5f},{0,1}}, {{ 0.5f,-0.5f, 0.5f},{1,1}}, {{ 0.5f, 0.5f, 0.5f},{1,0}}, {{-0.5f, 0.5f, 0.5f},{0,0}},
+        // -Z back
+        {{ 0.5f,-0.5f,-0.5f},{0,1}}, {{-0.5f,-0.5f,-0.5f},{1,1}}, {{-0.5f, 0.5f,-0.5f},{1,0}}, {{ 0.5f, 0.5f,-0.5f},{0,0}},
+        // +X right
+        {{ 0.5f,-0.5f, 0.5f},{0,1}}, {{ 0.5f,-0.5f,-0.5f},{1,1}}, {{ 0.5f, 0.5f,-0.5f},{1,0}}, {{ 0.5f, 0.5f, 0.5f},{0,0}},
+        // -X left
+        {{-0.5f,-0.5f,-0.5f},{0,1}}, {{-0.5f,-0.5f, 0.5f},{1,1}}, {{-0.5f, 0.5f, 0.5f},{1,0}}, {{-0.5f, 0.5f,-0.5f},{0,0}},
+        // +Y top
+        {{-0.5f, 0.5f, 0.5f},{0,1}}, {{ 0.5f, 0.5f, 0.5f},{1,1}}, {{ 0.5f, 0.5f,-0.5f},{1,0}}, {{-0.5f, 0.5f,-0.5f},{0,0}},
+        // -Y bottom
+        {{-0.5f,-0.5f,-0.5f},{0,1}}, {{ 0.5f,-0.5f,-0.5f},{1,1}}, {{ 0.5f,-0.5f, 0.5f},{1,0}}, {{-0.5f,-0.5f, 0.5f},{0,0}},
     };
 
-    std::optional<Buffer> vbo = Buffer::Create(*m_device, BufferUsage::VERTEX, sizeof(vertices), "placeholder_vbo");
-    if (!vbo)
+    uint16_t indices[36];
+    for (uint16_t face = 0; face < 6; ++face) {
+        const uint16_t base = face * 4;
+        const uint16_t faceIndices[6] = {
+            base, uint16_t(base + 1), uint16_t(base + 2),
+            base, uint16_t(base + 2), uint16_t(base + 3)
+        };
+        std::memcpy(indices + face * 6, faceIndices, sizeof(faceIndices));
+    }
+
+    auto image = ImageIO::Load("/Game/textures/test.png");
+    if (!image) {
+        LUTUM_ERROR("Renderer: failed to load test texture");
         return false;
+    }
+
+    Texture::CreateInfo texInfo = {};
+    texInfo.width = image->width;
+    texInfo.height = image->height;
+    std::optional<Texture> texture = Texture::Create(*m_device, texInfo, "test_texture");
+    if (!texture)
+        return false;
+    m_placeholderTexture = std::move(*texture);
+
+    SDL_GPUSamplerCreateInfo samplerInfo = {};
+    samplerInfo.min_filter = SDL_GPU_FILTER_LINEAR;
+    samplerInfo.mag_filter = SDL_GPU_FILTER_LINEAR;
+    samplerInfo.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+    samplerInfo.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+    samplerInfo.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+    samplerInfo.max_lod = 1000.0f;
+    m_sampler = SDL_CreateGPUSampler(m_device->NativeHandle(), &samplerInfo);
+    if (!m_sampler)
+        return false;
+
+    // buffers
+    std::optional<Buffer> vbo = Buffer::Create(*m_device, BufferUsage::VERTEX, sizeof(vertices), "placeholder_vbo");
+    if (!vbo) return false;
     m_placeholderVBO = std::move(*vbo);
 
-    BufferUploader uploader(*m_device);
-    if (!uploader.Begin())
-        return false;
-    if (!uploader.Upload(m_placeholderVBO, vertices, sizeof(vertices)))
-        return false;
-    if (!uploader.End())
-        return false;
+    std::optional<Buffer> ibo = Buffer::Create(*m_device, BufferUsage::INDEX, sizeof(indices), "placeholder_ibo");
+    if (!ibo) return false;
+    m_placeholderIBO = std::move(*ibo);
+
+    GpuUploader uploader(*m_device);
+    if (!uploader.Begin()) return false;
+    if (!uploader.Upload(m_placeholderVBO, vertices, sizeof(vertices))) return false;
+    if (!uploader.Upload(m_placeholderIBO, indices, sizeof(indices))) return false;
+    if (!uploader.Upload(m_placeholderTexture, image->pixels.data(),
+                         static_cast<uint32_t>(image->pixels.size()))) return false;
+    if (!uploader.End()) return false;
 
     m_initialized = true;
     return true;
@@ -187,9 +206,17 @@ void Renderer::RenderScene(Curia::Registry& registry, RenderTarget& target) {
 
     if (hasCamera) {
         SDL_BindGPUGraphicsPipeline(pass, m_placeholderPipeline.NativeHandle());
+
         SDL_GPUBufferBinding vertexBinding = {m_placeholderVBO.NativeHandle(), 0};
         SDL_BindGPUVertexBuffers(pass, 0, &vertexBinding, 1);
-        SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0);
+
+        SDL_GPUBufferBinding indexBinding = {m_placeholderIBO.NativeHandle(), 0};
+        SDL_BindGPUIndexBuffer(pass, &indexBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+
+        SDL_GPUTextureSamplerBinding textureBinding = {m_placeholderTexture.NativeHandle(), m_sampler};
+        SDL_BindGPUFragmentSamplers(pass, 0, &textureBinding, 1);
+
+        SDL_DrawGPUIndexedPrimitives(pass, 36, 1, 0, 0, 0);
     }
 
     SDL_EndGPURenderPass(pass);
@@ -233,6 +260,9 @@ void Renderer::Shutdown() {
     // Make sure the GPU isn't still using the pipeline before releasing it.
     SDL_WaitForGPUIdle(m_device->NativeHandle());
 
+    SDL_ReleaseGPUSampler(m_device->NativeHandle(), m_sampler);
+    m_placeholderTexture = Texture{};
+    m_placeholderIBO = Buffer{};
     m_placeholderVBO = Buffer{};
     m_placeholderPipeline = GraphicsPipeline{};
     m_shaderCompiler.reset();

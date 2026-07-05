@@ -15,6 +15,7 @@
 #include <chrono>
 #include <thread>
 
+#include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Core/Jobs.hpp"
 #include "Lutum/Core/Log.hpp"
 #include "Lutum/Core/Time.hpp"
@@ -34,9 +35,14 @@ Application::~Application() {
     Shutdown();
 }
 
-bool Application::Initialize() {
+bool Application::Initialize(const char* projectPath) {
     Log::Initialize();
     Jobs::Initialize();
+
+    if (!FileSystem::Initialize())
+        return false;
+    if (!FileSystem::MountProject(projectPath))
+        return false;
 
     m_platform = std::make_unique<Lutum::PlatformContext>();
     if (!m_platform->IsValid())
@@ -144,6 +150,7 @@ void Application::Shutdown() {
     m_platform.reset();
 
     Jobs::Shutdown();
+    FileSystem::Shutdown();
     Log::Shutdown();
 }
 } // Lutum

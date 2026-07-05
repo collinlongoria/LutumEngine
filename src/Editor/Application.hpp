@@ -35,7 +35,7 @@ public:
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
 
-    bool Initialize();
+    bool Initialize(const char* projectPath);
     void Run();
     void Shutdown();
 

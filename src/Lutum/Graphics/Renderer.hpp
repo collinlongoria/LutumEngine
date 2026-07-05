@@ -14,12 +14,15 @@
 #define LUTUM_RENDERER_HPP
 #include <memory>
 
+#include "Texture.hpp"
 #include "Lutum/Graphics/Buffer.hpp"
 #include "Lutum/Graphics/GraphicsPipeline.hpp"
 #include "Lutum/ECS/Query.hpp"
 #include "Lutum/Scene/Camera.hpp"
 #include "Lutum/Scene/Transform.hpp"
 #include "Lutum/Graphics/RenderTarget.hpp"
+
+struct SDL_GPUSampler;
 
 namespace Lutum {
 
@@ -61,6 +64,9 @@ private:
     GraphicsPipeline m_placeholderPipeline;
     Buffer m_placeholderVBO;
     RenderTarget m_sceneTarget;
+    Texture m_placeholderTexture;
+    Buffer m_placeholderIBO;
+    SDL_GPUSampler* m_sampler = nullptr;
 
     Curia::Query<Transform, CameraComponent, Curia::With<ActiveCamera>> m_cameraQuery;
 };

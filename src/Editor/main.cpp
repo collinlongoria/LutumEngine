@@ -15,9 +15,10 @@
 #include "Editor/Application.hpp"
 
 int main(int argc, char ** argv) {
-    Lutum::Application app;
+    const char* projectPath = (argc > 1) ? argv[1] : "LutumProject";
 
-    if (!app.Initialize())
+    Lutum::Application app;
+    if (!app.Initialize(projectPath))
         return EXIT_FAILURE;
 
     app.Run();
