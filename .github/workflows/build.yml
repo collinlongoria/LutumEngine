@@ -2,9 +2,9 @@ name: Build and Test
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
   build:
@@ -22,9 +22,13 @@ jobs:
           -S .
           -B build
           -DLUTUM_BUILD_TESTS=ON
+          -DLUTUM_BUILD_EDITOR=OFF
+          -DLUTUM_ENABLE_RENDERER=OFF
+          -DLUTUM_ENABLE_DEBUG_UI=OFF
+          -DLUTUM_BUILD_SHADER_TOOLS_FROM_SOURCE=OFF
 
-      - name: Build
-        run: cmake --build build --config Release
+      - name: Build tests
+        run: cmake --build build --config Release --target LutumTests --parallel
 
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure

@@ -5,7 +5,7 @@ add_executable(LutumTests
 )
 
 target_link_libraries(LutumTests PRIVATE
-        LutumEngine
+        LutumCore
         doctest::doctest
 )
 
