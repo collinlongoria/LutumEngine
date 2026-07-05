@@ -76,3 +76,6 @@ Testing/
 !.idea/runConfigurations
 cmake-build-*/
 out/
+
+# Local dev project
+LutumProject/
