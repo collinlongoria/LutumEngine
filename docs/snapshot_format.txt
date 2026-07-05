@@ -1,0 +1,39 @@
+(i will make good docs later. saving this here so i can ref later)
+
+LREG snapshot v1
+
+notes:
+little-endian
+packed
+no alignment padding
+
+Header
+    char[4] magic   "LREG"
+    u32     version 1
+
+Type table (types ref. by populated archetypes, sorted by key)
+    u32     typeCount
+    repeat typeCount:
+        u64     stableKey       FNV-1a of kCuriaName
+        u32     size            0 for tags
+        u16     nameLen
+        u8[]    name            NOT null-terminated
+
+Directory
+    u32     directoryCount      m_directory.size()
+    u32     freeCount
+    repeat freeCount (free-list order):
+        u32     index
+        u32     generation
+
+Archetypes (populated only, sorted by key-signature)
+    u32     archetypeCount
+    repeat archetypeCount:
+        u32     sigCount
+        u32[]   sigCount type-table indices (key-sorted)
+        u32     rows
+        u64[]   rows entity IDs (slab-major)
+        per non-tag signature type (key order):
+            u8[] rows*size packed column (slabs concatenated)
+
+Raw component bytes: any component layout change invalidates the file. Bump version on layout change.

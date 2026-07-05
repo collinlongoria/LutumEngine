@@ -15,6 +15,8 @@
 #include <atomic>
 #include <cstdint>
 #include <cstddef>
+#include <cstring>
+#include <string>
 
 #include "Lutum/Core/Jobs.hpp"
 #include "Lutum/ECS/CommandBuffer.hpp"
@@ -382,4 +384,132 @@ TEST_CASE("stable keys: idempotent registration and lookup") {
     const ResourceID r = ResourceType<Position>::Id(); // any named class works
     CHECK(ResourceType<Position>::Id() == r);
     CHECK(ResourceRegistry::Name(r) == "Test.Position");
+}
+
+namespace {
+
+struct ByteReader {
+    const std::vector<uint8_t>& buf;
+    size_t pos = 0;
+
+    template <typename T>
+    T Read() {
+        T v{};
+        REQUIRE(pos + sizeof(T) <= buf.size());
+        std::memcpy(&v, buf.data() + pos, sizeof(T));
+        pos += sizeof(T);
+        return v;
+    }
+    void Skip(size_t n) {
+        REQUIRE(pos + n <= buf.size());
+        pos += n;
+    }
+    std::string ReadString(size_t n) {
+        REQUIRE(pos + n <= buf.size());
+        std::string s(reinterpret_cast<const char*>(buf.data() + pos), n);
+        pos += n;
+        return s;
+    }
+};
+
+} // anonymous namespace
+
+TEST_CASE("snapshot writer: header, determinism, full-buffer walk") {
+    Registry r;
+
+    Entity a = r.Create();
+    r.Add(a, Position{1, 2, 3});
+    r.Add(a, Velocity{4, 5, 6});
+
+    Entity b = r.Create();
+    r.Add(b, Position{7, 8, 9});
+    r.Add<DeadTag>(b);
+
+    Entity bare = r.Create();            // stays in the empty archetype
+    Entity doomed = r.Create();
+    r.Destroy(doomed);                   // becomes a free-list entry
+
+    const std::vector<uint8_t> bytes = r.SaveSnapshot();
+    CHECK(r.SaveSnapshot() == bytes);    // canonical: same state, same bytes
+
+    ByteReader rd{bytes};
+
+    // Header
+    CHECK(rd.ReadString(4) == "LREG");
+    CHECK(rd.Read<uint32_t>() == 1);
+
+    // Type table: Position, Velocity, DeadTag (key-sorted; order not asserted)
+    const uint32_t typeCount = rd.Read<uint32_t>();
+    CHECK(typeCount == 3);
+
+    struct FileType { uint64_t key; uint32_t size; std::string name; };
+    std::vector<FileType> types;
+    uint64_t prevKey = 0;
+    for (uint32_t i = 0; i < typeCount; ++i) {
+        FileType t;
+        t.key = rd.Read<uint64_t>();
+        t.size = rd.Read<uint32_t>();
+        t.name = rd.ReadString(rd.Read<uint16_t>());
+        CHECK(t.key > prevKey);          // strictly ascending
+        prevKey = t.key;
+        CHECK(t.key == HashName(t.name.c_str()));
+        types.push_back(std::move(t));
+    }
+    const auto findType = [&](const char* name) -> const FileType* {
+        for (const FileType& t : types)
+            if (t.name == name) return &t;
+        return nullptr;
+    };
+    REQUIRE(findType("Test.Position"));
+    CHECK(findType("Test.Position")->size == sizeof(Position));
+    REQUIRE(findType("Test.Velocity"));
+    CHECK(findType("Test.Velocity")->size == sizeof(Velocity));
+    REQUIRE(findType("Test.DeadTag"));
+    CHECK(findType("Test.DeadTag")->size == 0);
+
+    // Directory
+    CHECK(rd.Read<uint32_t>() == 4);     // directory size: a, b, bare, doomed
+    const uint32_t freeCount = rd.Read<uint32_t>();
+    REQUIRE(freeCount == 1);
+    CHECK(rd.Read<uint32_t>() == EntityTraits::Index(doomed));
+    CHECK(rd.Read<uint32_t>() == EntityTraits::Generation(doomed) + 1);
+
+    // Archetypes: [] (bare), [Pos,Vel] (a), [Pos,DeadTag] (b) — 3 populated
+    const uint32_t archCount = rd.Read<uint32_t>();
+    CHECK(archCount == 3);
+
+    size_t totalRows = 0;
+    bool sawBare = false, sawA = false, sawB = false;
+    for (uint32_t i = 0; i < archCount; ++i) {
+        const uint32_t sigCount = rd.Read<uint32_t>();
+        std::vector<uint32_t> sig(sigCount);
+        for (auto& s : sig) {
+            s = rd.Read<uint32_t>();
+            REQUIRE(s < typeCount);
+        }
+
+        const uint32_t rows = rd.Read<uint32_t>();
+        totalRows += rows;
+
+        std::vector<Entity> ents(rows);
+        for (auto& e : ents)
+            e = rd.Read<uint64_t>();
+
+        if (sigCount == 0) {
+            sawBare = (rows == 1 && ents[0] == bare);
+        }
+        if (rows == 1 && ents[0] == a) sawA = true;
+        if (rows == 1 && ents[0] == b) sawB = true;
+
+        // Skip packed columns using file-declared sizes
+        for (uint32_t s : sig)
+            rd.Skip(static_cast<size_t>(rows) * types[s].size);
+    }
+    CHECK(totalRows == 3);
+    CHECK(sawBare);
+    CHECK(sawA);
+    CHECK(sawB);
+
+    // The walk must consume the buffer exactly
+    CHECK(rd.pos == bytes.size());
 }

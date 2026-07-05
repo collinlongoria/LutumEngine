@@ -122,6 +122,11 @@ public:
         return *resource;
     }
 
+    // --- Snapshot ---
+
+    [[nodiscard]]
+    std::vector<uint8_t> SaveSnapshot() const;
+
 private:
     struct EntityRecord {
         Archetype* archetype = nullptr;
