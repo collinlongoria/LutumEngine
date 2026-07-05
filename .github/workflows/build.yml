@@ -2,9 +2,9 @@ name: Build and Test
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   pull_request:
-    branches: [main, dev]
+    branches: [main]
 
 jobs:
   build:
@@ -14,7 +14,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Checkout required test submodules
+        run: |
+          git submodule update --init external/glm
+          git submodule update --init external/doctest
+          git submodule update --init external/SDL
 
       - name: Configure
         run: >
