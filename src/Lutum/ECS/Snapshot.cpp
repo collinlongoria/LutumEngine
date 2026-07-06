@@ -16,6 +16,8 @@
 #include <bit>
 #include <cstring>
 #include <unordered_map>
+#include <optional>
+#include <span>
 
 namespace Lutum::Curia {
 
@@ -37,6 +39,34 @@ namespace {
         void U16(uint16_t v) { Bytes(&v, sizeof(v)); }
         void U32(uint32_t v) { Bytes(&v, sizeof(v)); }
         void U64(uint64_t v) { Bytes(&v, sizeof(v)); }
+    };
+
+    struct ByteReader {
+        const uint8_t* data = nullptr;
+        size_t size = 0;
+        size_t pos = 0;
+
+        bool Bytes(void* out, size_t n) {
+            if (n > size - pos)
+                return false;
+            std::memcpy(out, data + pos, n);
+            pos += n;
+            return true;
+        }
+
+        // zero-copy view into the buffer
+        // nullptr on overrun
+        [[nodiscard]]
+        const uint8_t* View(size_t n) {
+            if (n > size - pos)
+                return nullptr;
+            const uint8_t* p = data + pos;
+            pos += n;
+            return p;
+        }
+
+        template <typename T>
+        bool Read(T& out) { return Bytes(&out, sizeof(T)); }
     };
 
     struct TypeRef {
@@ -162,4 +192,208 @@ std::vector<uint8_t> Registry::SaveSnapshot() const {
 
     return w.buf;
 }
+
+bool Registry::LoadSnapshot(std::span<const uint8_t> bytes) {
+    LUTUM_ASSERT(m_directory.empty() && m_archetypes.size() == 1, "LoadSnapshot: requires a freshly constructed registry");
+
+    ByteReader r{bytes.data(), bytes.size()};
+
+    // Header
+
+    uint8_t magic[4] = {};
+    if (!r.Bytes(magic, sizeof(magic)) || std::memcmp(magic, kMagic, sizeof(kMagic)) != 0) {
+        LUTUM_ERROR("snapshot: bad magic");
+        return false;
+    }
+    uint32_t version = 0;
+    if (!r.Read(version) || version != kSnapshotVersion) {
+        LUTUM_ERROR("snapshot: unsupported version {} (expected {})", version, kSnapshotVersion);
+        return false;
+    }
+
+    // parse + validate
+
+    struct FileType {
+        StableKey key = 0;
+        uint32_t size = 0;
+        std::string name;
+        std::optional<ComponentID> cid;
+    };
+
+    uint32_t typeCount = 0;
+    if (!r.Read(typeCount)) {
+        LUTUM_ERROR("snapshot: truncated type table");
+        return false;
+    }
+
+    std::vector<FileType> types(typeCount);
+    for (FileType& t : types) {
+        uint16_t nameLen = 0;
+        if (!r.Read(t.key) || !r.Read(t.size) || !r.Read(nameLen)) {
+            LUTUM_ERROR("snapshot: truncated type table");
+            return false;
+        }
+        const uint8_t* namePtr = r.View(nameLen);
+        if (!namePtr) {
+            LUTUM_ERROR("snapshot: truncated type name");
+            return false;
+        }
+        t.name.assign(reinterpret_cast<const char*>(namePtr), nameLen);
+
+        t.cid = ComponentRegistry::FindByKey(t.key);
+        if (t.cid) {
+            const ComponentInfo& info = ComponentRegistry::Get(*t.cid);
+            if (info.size != t.size) {
+                LUTUM_ERROR("snapshot: layout mismatch for '{}': file {}B, runtime {}B — "
+                            "component changed since save (bump snapshot version)",
+                            t.name, t.size, info.size);
+                return false;
+            }
+        }
+        else {
+            LUTUM_WARN("snapshot: dropping unknown component '{}' (key {:#018x})", t.name, t.key);
+        }
+    }
+
+    // Directory
+
+    uint32_t directoryCount = 0;
+    uint32_t freeCount = 0;
+    if (!r.Read(directoryCount) || !r.Read(freeCount) || freeCount > directoryCount) {
+        LUTUM_ERROR("snapshot: bad directory header");
+        return false;
+    }
+
+    std::vector<std::pair<uint32_t, uint32_t>> freeList(freeCount); // (index, generation)
+    std::vector<bool> claimed(directoryCount, false);
+    for (auto& [index, generation] : freeList) {
+        if (!r.Read(index) || !r.Read(generation) || index >= directoryCount || claimed[index]) {
+            LUTUM_ERROR("snapshot: bad free-list entry");
+            return false;
+        }
+        claimed[index] = true;
+    }
+
+    // Archetypes
+
+    struct FileArch {
+        std::vector<uint32_t> sig; // type-table indices, strictly ascending
+        uint32_t rows = 0;
+        const uint8_t* entities = nullptr; // rows * sizeof(Entity)
+        std::vector<const uint8_t*> columns; // parallel to sig; nullptr for tags
+    };
+
+    uint32_t archCount = 0;
+    if (!r.Read(archCount)) {
+        LUTUM_ERROR("snapshot: truncated archetype list");
+        return false;
+    }
+
+    std::vector<FileArch> arches(archCount);
+    uint64_t aliveRows = 0;
+    for (FileArch& fa : arches) {
+        uint32_t sigCount = 0;
+        if (!r.Read(sigCount)) {
+            LUTUM_ERROR("snapshot: truncated signature");
+            return false;
+        }
+        fa.sig.resize(sigCount);
+        for (size_t i = 0; i < sigCount; ++i) {
+            if (!r.Read(fa.sig[i]) || fa.sig[i] >= typeCount ||
+                (i > 0 && fa.sig[i] <= fa.sig[i - 1])) {
+                LUTUM_ERROR("snapshot: bad signature (index out of range or not strictly ascending)");
+                return false;
+            }
+        }
+
+        if (!r.Read(fa.rows)) {
+            LUTUM_ERROR("snapshot: truncated archetype");
+            return false;
+        }
+
+        fa.entities = r.View(static_cast<size_t>(fa.rows) * sizeof(Entity));
+        if (!fa.entities) {
+            LUTUM_ERROR("snapshot: truncated entity list");
+            return false;
+        }
+        for (uint32_t row = 0; row < fa.rows; ++row) {
+            Entity e = INVALID_ENTITY;
+            std::memcpy(&e, fa.entities + static_cast<size_t>(row) * sizeof(Entity), sizeof(Entity));
+            const uint32_t index = EntityTraits::Index(e);
+            if (index >= directoryCount || claimed[index]) {
+                LUTUM_ERROR("snapshot: entity index {} out of range or duplicated", index);
+                return false;
+            }
+            claimed[index] = true;
+        }
+        aliveRows += fa.rows;
+
+        fa.columns.resize(sigCount, nullptr);
+        for (size_t i = 0; i < sigCount; ++i) {
+            const uint32_t colSize = types[fa.sig[i]].size;
+            if (colSize == 0)
+                continue; // tags: no bytes
+            fa.columns[i] = r.View(static_cast<size_t>(fa.rows) * colSize);
+            if (!fa.columns[i]) {
+                LUTUM_ERROR("snapshot: truncated component column '{}'", types[fa.sig[i]].name);
+                return false;
+            }
+        }
+    }
+
+    if (r.pos != r.size) {
+        LUTUM_ERROR("snapshot: {} trailing bytes", r.size - r.pos);
+        return false;
+    }
+    if (aliveRows + freeCount != directoryCount) {
+        LUTUM_ERROR("snapshot: directory mismatch ({} alive + {} free != {})",
+                    aliveRows, freeCount, directoryCount);
+        return false;
+    }
+
+    // commit
+
+    m_directory.resize(directoryCount);
+    m_freeIndices.reserve(freeCount);
+    for (const auto& [index, generation] : freeList) {
+        m_directory[index].generation = generation;
+        m_freeIndices.push_back(index);
+    }
+
+    for (const FileArch& fa : arches) {
+        std::vector<ComponentID> runtimeSig;
+        runtimeSig.reserve(fa.sig.size());
+        for (uint32_t idx : fa.sig) {
+            if (types[idx].cid)
+                runtimeSig.push_back(*types[idx].cid);
+        }
+        std::sort(runtimeSig.begin(), runtimeSig.end());
+
+        // NOTE: dropping unknown components can merge two file archetypes into one runtime archetype
+        Archetype* arch = FindOrCreateArchetype(std::move(runtimeSig));
+
+        for (uint32_t row = 0; row < fa.rows; ++row) {
+            Entity e = INVALID_ENTITY;
+            std::memcpy(&e, fa.entities + static_cast<size_t>(row) * sizeof(Entity), sizeof(Entity));
+
+            auto [slabIndex, rowIndex] = arch->AllocateRow(e);
+            EntityRecord& record = m_directory[EntityTraits::Index(e)];
+            record.archetype = arch;
+            record.slabIndex = slabIndex;
+            record.rowIndex = rowIndex;
+            record.generation = EntityTraits::Generation(e);
+
+            for (size_t i = 0; i < fa.sig.size(); ++i) {
+                const FileType& t = types[fa.sig[i]];
+                if (!t.cid || t.size == 0)
+                    continue;
+                arch->WriteComponent(*t.cid, arch->GetSlab(slabIndex), rowIndex,
+                                     fa.columns[i] + static_cast<size_t>(row) * t.size);
+            }
+        }
+    }
+
+    return true;
+}
+
 } // Lutum::Curia

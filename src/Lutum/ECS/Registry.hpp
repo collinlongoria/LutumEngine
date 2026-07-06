@@ -17,6 +17,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
+#include <span>
 
 #include "Lutum/Core/Log.hpp"
 #include "Lutum/ECS/Archetype.hpp"
@@ -126,6 +127,8 @@ public:
 
     [[nodiscard]]
     std::vector<uint8_t> SaveSnapshot() const;
+    [[nodiscard]]
+    bool LoadSnapshot(std::span<const uint8_t> bytes);
 
 private:
     struct EntityRecord {

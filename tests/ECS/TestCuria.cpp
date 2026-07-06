@@ -513,3 +513,153 @@ TEST_CASE("snapshot writer: header, determinism, full-buffer walk") {
     // The walk must consume the buffer exactly
     CHECK(rd.pos == bytes.size());
 }
+
+namespace {
+
+// Byte offsets of a type-table entry's key and size fields
+std::pair<size_t, size_t> FindTypeEntryOffsets(const std::vector<uint8_t>& buf,
+                                               std::string_view name) {
+    ByteReader rd{buf};
+    rd.Skip(8); // magic + version
+    const uint32_t typeCount = rd.Read<uint32_t>();
+    for (uint32_t i = 0; i < typeCount; ++i) {
+        const size_t keyOff = rd.pos;
+        rd.Read<uint64_t>();
+        const size_t sizeOff = rd.pos;
+        rd.Read<uint32_t>();
+        const uint16_t nameLen = rd.Read<uint16_t>();
+        if (rd.ReadString(nameLen) == name)
+            return {keyOff, sizeOff};
+    }
+    REQUIRE_MESSAGE(false, "type not found in snapshot");
+    return {0, 0};
+}
+
+} // anonymous namespace
+
+TEST_CASE("snapshot round-trip: multi-slab, tags, free list, byte identity") {
+    Registry src;
+
+    // AlignedThing is 16B -> 1024 rows/slab; 1500 entities forces multiple slabs
+    std::vector<Entity> ents;
+    ents.reserve(1500);
+    for (int i = 0; i < 1500; ++i) {
+        Entity e = src.Create();
+        src.Add(e, AlignedThing{{static_cast<float>(i), 0.5f, 0.0f, 0.0f}});
+        if (i % 3 == 0) src.Add(e, Position{static_cast<float>(i), 0, 0});
+        if (i % 5 == 0) src.Add<Frozen>(e);
+        ents.push_back(e);
+    }
+    Entity bare = src.Create();          // component-less, must survive
+    const Entity dead1 = ents[10];
+    const Entity dead2 = ents[20];
+    src.Destroy(dead1);
+    src.Destroy(dead2);
+
+    const std::vector<uint8_t> bytes = src.SaveSnapshot();
+
+    Registry dst;
+    REQUIRE(dst.LoadSnapshot(bytes));
+
+    // Byte-identical resave BEFORE any mutation
+    CHECK(dst.SaveSnapshot() == bytes);
+
+    CHECK(dst.EntityCount() == src.EntityCount());
+    CHECK(dst.Alive(bare));
+    CHECK_FALSE(dst.Alive(dead1));
+    CHECK_FALSE(dst.Alive(dead2));
+
+    for (int i = 0; i < 1500; ++i) {
+        if (i == 10 || i == 20)
+            continue;
+        const Entity e = ents[i];
+        REQUIRE(dst.Alive(e));
+        const AlignedThing* at = dst.Get<AlignedThing>(e);
+        REQUIRE(at != nullptr);
+        CHECK(at->v[0] == static_cast<float>(i));
+        CHECK(dst.Has<Position>(e) == (i % 3 == 0));
+        CHECK(dst.Has<Frozen>(e) == (i % 5 == 0));
+        if (i % 3 == 0)
+            CHECK(dst.Get<Position>(e)->x == static_cast<float>(i));
+    }
+
+    // Free list restored in order: Create() pops dead2's index first (LIFO),
+    // with the post-destroy generation
+    const Entity n1 = dst.Create();
+    CHECK(EntityTraits::Index(n1) == EntityTraits::Index(dead2));
+    CHECK(EntityTraits::Generation(n1) == EntityTraits::Generation(dead2) + 1);
+}
+
+TEST_CASE("snapshot load: unknown component dropped, archetypes merge") {
+    Registry src;
+    Entity e1 = src.Create();
+    src.Add(e1, Position{1, 2, 3});
+    src.Add(e1, Velocity{4, 5, 6});
+    Entity e2 = src.Create();
+    src.Add(e2, Position{7, 8, 9});    // already [Position]-only
+
+    std::vector<uint8_t> bytes = src.SaveSnapshot();
+
+    // Make Velocity's key unknown to this binary
+    const auto [keyOff, sizeOff] = FindTypeEntryOffsets(bytes, "Test.Velocity");
+    const uint64_t bogus = 0xDEADBEEFCAFEF00DULL;
+    std::memcpy(bytes.data() + keyOff, &bogus, sizeof(bogus));
+
+    Registry dst;
+    REQUIRE(dst.LoadSnapshot(bytes)); // warns, does not fail
+
+    // e1's [Pos,Vel] collapsed to [Pos] and merged with e2's archetype
+    REQUIRE(dst.Alive(e1));
+    REQUIRE(dst.Alive(e2));
+    CHECK(dst.Has<Position>(e1));
+    CHECK_FALSE(dst.Has<Velocity>(e1));
+    CHECK(dst.Get<Position>(e1)->y == 2);
+    CHECK(dst.Get<Position>(e2)->z == 9);
+    CHECK(dst.ArchetypeCount() == 2); // empty + [Position]
+}
+
+TEST_CASE("snapshot load: failures leave the registry untouched") {
+    Registry src;
+    Entity e = src.Create();
+    src.Add(e, Position{1, 2, 3});
+    const std::vector<uint8_t> good = src.SaveSnapshot();
+
+    SUBCASE("layout size mismatch") {
+        std::vector<uint8_t> bad = good;
+        const auto [keyOff, sizeOff] = FindTypeEntryOffsets(bad, "Test.Position");
+        const uint32_t wrongSize = sizeof(Position) + 4;
+        std::memcpy(bad.data() + sizeOff, &wrongSize, sizeof(wrongSize));
+
+        Registry dst;
+        CHECK_FALSE(dst.LoadSnapshot(bad));
+        CHECK(dst.EntityCount() == 0);
+        CHECK(dst.Alive(dst.Create())); // still usable
+    }
+    SUBCASE("bad magic") {
+        std::vector<uint8_t> bad = good;
+        bad[0] = 'X';
+        Registry dst;
+        CHECK_FALSE(dst.LoadSnapshot(bad));
+        CHECK(dst.EntityCount() == 0);
+    }
+    SUBCASE("bad version") {
+        std::vector<uint8_t> bad = good;
+        const uint32_t v = 999;
+        std::memcpy(bad.data() + 4, &v, sizeof(v));
+        Registry dst;
+        CHECK_FALSE(dst.LoadSnapshot(bad));
+    }
+    SUBCASE("truncated") {
+        std::vector<uint8_t> bad = good;
+        bad.pop_back();
+        Registry dst;
+        CHECK_FALSE(dst.LoadSnapshot(bad));
+        CHECK(dst.EntityCount() == 0);
+    }
+    SUBCASE("trailing bytes") {
+        std::vector<uint8_t> bad = good;
+        bad.push_back(0);
+        Registry dst;
+        CHECK_FALSE(dst.LoadSnapshot(bad));
+    }
+}
