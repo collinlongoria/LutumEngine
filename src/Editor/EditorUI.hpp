@@ -12,7 +12,11 @@
 
 #ifndef LUTUM_EDITORUI_HPP
 #define LUTUM_EDITORUI_HPP
-#include <cstdint>
+
+#include "Editor/EditorContext.hpp"
+#include "Editor/Panels/StatsPanel.hpp"
+#include "Editor/Panels/SystemsPanel.hpp"
+#include "Editor/Panels/ViewportPanel.hpp"
 
 namespace Lutum {
 class RenderTarget;
@@ -24,14 +28,18 @@ public:
     // Call between Debug::UI::BeginFrame and the renderer's UI pass
     void Draw(Curia::Registry& registry, Curia::Scheduler& scheduler, RenderTarget& sceneTarget);
 
-private:
-    void DrawViewport(Curia::Registry& registry, RenderTarget& sceneTarget);
-    void DrawStats(Curia::Registry& registry);
+    [[nodiscard]]
+    const EditorContext& Context() const { return m_context; }
 
-    // Resize debounce: apply only after the requested size is stable
-    uint32_t m_pendingWidth = 0;
-    uint32_t m_pendingHeight = 0;
-    uint32_t m_stableFrames = 0;
+private:
+    void DrawMainMenuBar(Curia::Registry& registry);
+    void SaveSnapshotToDisk(Curia::Registry& registry);
+    void LoadSnapshotFromDisk(Curia::Registry& registry);
+
+    EditorContext m_context;
+    ViewportPanel m_viewportPanel;
+    StatsPanel m_statsPanel;
+    SystemsPanel m_systemsPanel;
 };
 } // Lutum
 

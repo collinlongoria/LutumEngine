@@ -228,6 +228,13 @@ if(LUTUM_BUILD_EDITOR)
             src/Editor/Application.hpp
             src/Editor/EditorUI.cpp
             src/Editor/EditorUI.hpp
+            src/Editor/EditorContext.hpp
+            src/Editor/Panels/ViewportPanel.hpp
+            src/Editor/Panels/ViewportPanel.cpp
+            src/Editor/Panels/StatsPanel.hpp
+            src/Editor/Panels/StatsPanel.cpp
+            src/Editor/Panels/SystemsPanel.hpp
+            src/Editor/Panels/SystemsPanel.cpp
     )
     target_link_libraries(LutumEditor PRIVATE LutumEngine)
 endif()

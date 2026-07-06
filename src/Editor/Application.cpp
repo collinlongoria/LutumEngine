@@ -98,7 +98,7 @@ bool Application::Initialize(const char* projectPath) {
     m_registry.Add(camera, FlyCam{});
     m_registry.Add<ActiveCamera>(camera);
 
-    m_registry.GetResource<Input>().SetRelativeMouseMode(*m_window, true);
+    m_registry.GetResource<Input>().SetRelativeMouseMode(*m_window, false);
 
     return true;
 }
@@ -116,14 +116,17 @@ void Application::Run() {
         Input& input = m_registry.GetResource<Input>();
         input.Update();
 
-        // Editor fly controls: relative mouse while RMB held over the viewport.
+        // Editor fly controls
         const ViewportInfo& viewport = m_registry.GetResource<ViewportInfo>();
         const bool wantFly = viewport.hovered && input.IsMouseButtonDown(MouseButton::RIGHT);
         if (wantFly != input.IsRelativeMouseMode())
             input.SetRelativeMouseMode(*m_window, wantFly);
 
         Debug::UI::BeginFrame();
-        m_editorUI.Draw(m_registry, m_scheduler, m_sceneTarget);   // writes ViewportInfo, resizes target
+        m_editorUI.Draw(m_registry, m_scheduler, m_sceneTarget); // writes ViewportInfo, resizes target
+
+        if (m_editorUI.Context().exitRequested)
+            m_window->RequestClose();
 
         m_scheduler.Run();
 

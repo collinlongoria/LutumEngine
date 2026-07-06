@@ -12,94 +12,83 @@
 
 #include "Editor/EditorUI.hpp"
 
+#include <format>
+
 #include <imgui.h>
 
-#include "Lutum/Core/Time.hpp"
-#include "Lutum/Debug/DebugUI.hpp"
+#include "Lutum/Core/FileSystem.hpp"
+#include "Lutum/Core/Log.hpp"
 #include "Lutum/ECS/Registry.hpp"
-#include "Lutum/ECS/Scheduler.hpp"
-#include "Lutum/Graphics/RenderTarget.hpp"
-#include "Lutum/Platform/Window.hpp"
-#include "Lutum/Scene/Camera.hpp"
 
 namespace Lutum {
 
-static constexpr uint32_t kResizeStableFrames = 10;
-static constexpr uint32_t kMinViewportSize = 16;
+// TODO: replace with dynamic path later
+static constexpr const char* kSnapshotPath = "/Game/scene.lsnap";
 
 void EditorUI::Draw(Curia::Registry& registry, Curia::Scheduler& scheduler, RenderTarget& sceneTarget) {
+    DrawMainMenuBar(registry);
     ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 
-    DrawViewport(registry, sceneTarget);
-    DrawStats(registry);
-
-    // Scheduler phases, straight from LogGraph's data (see Scheduler accessor)
-    if (ImGui::Begin("Systems")) {
-        const auto phases = scheduler.PhaseNames();
-        for (size_t i = 0; i < phases.size(); ++i) {
-            ImGui::SeparatorText(("Phase " + std::to_string(i)).c_str());
-            for (const auto& name : phases[i]) {
-                ImGui::BulletText("%.*s", static_cast<int>(name.size()), name.data());
-            }
-        }
-    }
-    ImGui::End();
+    m_viewportPanel.Draw(registry, sceneTarget);
+    if (m_context.showStats)
+        m_statsPanel.Draw(registry, m_context);
+    if (m_context.showSystems)
+        m_systemsPanel.Draw(scheduler, m_context);
 }
 
-void EditorUI::DrawViewport(Curia::Registry& registry, RenderTarget& sceneTarget) {
-    ViewportInfo& viewport = registry.GetResource<ViewportInfo>();
+void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
+    if (!ImGui::BeginMainMenuBar())
+        return;
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    const bool open = ImGui::Begin("Viewport");
-    ImGui::PopStyleVar();
-
-    if (open) {
-        const ImVec2 avail = ImGui::GetContentRegionAvail();
-        const uint32_t wantW = static_cast<uint32_t>(avail.x > 0 ? avail.x : 0);
-        const uint32_t wantH = static_cast<uint32_t>(avail.y > 0 ? avail.y : 0);
-
-        // Debounce: resize the target only after the panel size holds still.
-        if (wantW >= kMinViewportSize && wantH >= kMinViewportSize &&
-            (wantW != sceneTarget.Width() || wantH != sceneTarget.Height())) {
-            if (wantW == m_pendingWidth && wantH == m_pendingHeight) {
-                if (++m_stableFrames >= kResizeStableFrames) {
-                    sceneTarget.Resize(wantW, wantH);
-                    m_stableFrames = 0;
-                }
-            } else {
-                m_pendingWidth = wantW;
-                m_pendingHeight = wantH;
-                m_stableFrames = 0;
-            }
-        }
-
-        // Bind whatever the target currently is
-        SDL_GPUTexture* colorTex = sceneTarget.ColorTexture();
-
-        if (colorTex) {
-            // Pass the SDL_GPUTexture* directly
-            ImGui::Image(reinterpret_cast<ImTextureID>(colorTex),
-                         ImVec2(static_cast<float>(sceneTarget.Width()),
-                                static_cast<float>(sceneTarget.Height())));
-        }
-
-        viewport.width = sceneTarget.Width();
-        viewport.height = sceneTarget.Height();
-        viewport.hovered = ImGui::IsItemHovered();
-        viewport.focused = ImGui::IsWindowFocused();
+    if (ImGui::BeginMenu("File")) {
+        if (ImGui::MenuItem("Save Snapshot"))
+            SaveSnapshotToDisk(registry);
+        if (ImGui::MenuItem("Load Snapshot", nullptr, false, FileSystem::Exists(kSnapshotPath)))
+            LoadSnapshotFromDisk(registry);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Exit"))
+            m_context.exitRequested = true;
+        ImGui::EndMenu();
     }
-    ImGui::End();
+
+    if (ImGui::BeginMenu("View")) {
+        ImGui::MenuItem("Stats", nullptr, &m_context.showStats);
+        ImGui::MenuItem("Systems", nullptr, &m_context.showSystems);
+        ImGui::EndMenu();
+    }
+
+    ImGui::EndMainMenuBar();
 }
 
-void EditorUI::DrawStats(Curia::Registry& registry) {
-    if (ImGui::Begin("Stats")) {
-        const Time& time = registry.GetResource<Time>();
-        ImGui::Text("Frame: %.2f ms (%.0f fps)",
-                    time.DeltaSeconds() * 1000.0f,
-                    time.DeltaSeconds() > 0.0f ? 1.0f / time.DeltaSeconds() : 0.0f);
-        ImGui::Text("Entities: %zu", registry.EntityCount());
-        ImGui::Text("Archetypes: %zu", registry.ArchetypeCount());
+void EditorUI::SaveSnapshotToDisk(Curia::Registry& registry) {
+    const std::vector<uint8_t> bytes = registry.SaveSnapshot();
+    if (FileSystem::WriteBytes(kSnapshotPath, bytes)) {
+        m_context.statusMessage = std::format("Saved snapshot ({} bytes)", bytes.size());
+        LUTUM_INFO("Editor: saved snapshot to '{}' ({} bytes)", kSnapshotPath, bytes.size());
     }
-    ImGui::End();
+    else {
+        m_context.statusMessage = "Snapshot save FAILED (see log)";
+    }
+}
+
+void EditorUI::LoadSnapshotFromDisk(Curia::Registry& registry) {
+    const auto bytes = FileSystem::ReadBytes(kSnapshotPath);
+    if (!bytes) {
+        m_context.statusMessage = "Snapshot load FAILED: file unreadable";
+        return;
+    }
+
+    const std::vector<uint8_t> backup = registry.SaveSnapshot();
+
+    registry.Clear();
+    if (registry.LoadSnapshot(*bytes)) {
+        m_context.statusMessage = std::format("Loaded snapshot ({} bytes)", bytes->size());
+        LUTUM_INFO("Editor: loaded snapshot from '{}'", kSnapshotPath);
+    }
+    else {
+        [[maybe_unused]] const bool restored = registry.LoadSnapshot(backup);
+        LUTUM_ASSERT(restored, "backup snapshot restore failed");
+        m_context.statusMessage = "Snapshot load FAILED: incompatible data (scene restored)";
+    }
 }
 } // Lutum
