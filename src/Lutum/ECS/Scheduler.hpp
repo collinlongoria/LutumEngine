@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 #include <string_view>
+#include <span>
 
 #include "Lutum/ECS/CommandBuffer.hpp"
 #include "Lutum/ECS/Component.hpp"
@@ -47,6 +48,15 @@ namespace Lutum::Curia {
 */
 class Scheduler {
 public:
+    struct SystemView {
+        std::string_view name;
+        int phase = -1;
+        std::span<const ComponentID> reads;
+        std::span<const ComponentID> writes;
+        std::span<const ResourceID> resourceReads;
+        std::span<const ResourceID> resourceWrites;
+    };
+
     explicit Scheduler(Registry& registry) : m_registry(&registry) {}
 
     Scheduler(const Scheduler&) = delete;
@@ -120,6 +130,16 @@ public:
             }
         }
         return result;
+    }
+
+    [[nodiscard]]
+    size_t SystemCount() const { return m_systems.size(); }
+
+    [[nodiscard]]
+    SystemView GetSystemView(size_t index) const {
+        LUTUM_ASSERT(index < m_systems.size(), "system index {} out of range", index);
+        const SystemNode& node = *m_systems[index];
+        return SystemView{node.name, node.phase, node.reads, node.writes, node.resourceReads, node.resourceWrites};
     }
 
 private:

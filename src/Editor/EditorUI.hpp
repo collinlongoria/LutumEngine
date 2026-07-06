@@ -17,6 +17,10 @@
 #include "Editor/Panels/StatsPanel.hpp"
 #include "Editor/Panels/SystemsPanel.hpp"
 #include "Editor/Panels/ViewportPanel.hpp"
+#include "Editor/Panels/ArchetypesPanel.hpp"
+#include "Editor/Panels/EntitiesPanel.hpp"
+#include "Editor/Panels/InspectorPanel.hpp"
+#include "Editor/Panels/ResourcesPanel.hpp"
 
 namespace Lutum {
 class RenderTarget;
@@ -47,6 +51,10 @@ private:
     ViewportPanel m_viewportPanel;
     StatsPanel m_statsPanel;
     SystemsPanel m_systemsPanel;
+    EntitiesPanel m_entitiesPanel;
+    InspectorPanel m_inspectorPanel;
+    ArchetypesPanel m_archetypesPanel;
+    ResourcesPanel m_resourcesPanel;
 };
 } // Lutum
 

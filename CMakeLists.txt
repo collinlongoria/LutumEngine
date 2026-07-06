@@ -236,6 +236,14 @@ if(LUTUM_BUILD_EDITOR)
             src/Editor/Panels/StatsPanel.cpp
             src/Editor/Panels/SystemsPanel.hpp
             src/Editor/Panels/SystemsPanel.cpp
+            src/Editor/Panels/EntitiesPanel.hpp
+            src/Editor/Panels/EntitiesPanel.cpp
+            src/Editor/Panels/InspectorPanel.hpp
+            src/Editor/Panels/InspectorPanel.cpp
+            src/Editor/Panels/ArchetypesPanel.hpp
+            src/Editor/Panels/ArchetypesPanel.cpp
+            src/Editor/Panels/ResourcesPanel.hpp
+            src/Editor/Panels/ResourcesPanel.cpp
     )
     target_link_libraries(LutumEditor PRIVATE LutumEngine)
 endif()

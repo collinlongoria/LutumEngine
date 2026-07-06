@@ -40,6 +40,14 @@ void EditorUI::Draw(Curia::Registry& registry, Curia::Scheduler& scheduler, Rend
         m_statsPanel.Draw(registry, m_context);
     if (m_context.showSystems)
         m_systemsPanel.Draw(scheduler, m_context);
+    if (m_context.showEntities)
+        m_entitiesPanel.Draw(registry, m_context);
+    if (m_context.showInspector)
+        m_inspectorPanel.Draw(registry, m_context);
+    if (m_context.showArchetypes)
+        m_archetypesPanel.Draw(registry, m_context);
+    if (m_context.showResources)
+        m_resourcesPanel.Draw(registry, m_context);
 }
 
 void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
@@ -60,6 +68,10 @@ void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
     if (ImGui::BeginMenu("View")) {
         ImGui::MenuItem("Stats", nullptr, &m_context.showStats);
         ImGui::MenuItem("Systems", nullptr, &m_context.showSystems);
+        ImGui::MenuItem("Entities", nullptr, &m_context.showEntities);
+        ImGui::MenuItem("Inspector", nullptr, &m_context.showInspector);
+        ImGui::MenuItem("Archetypes", nullptr, &m_context.showArchetypes);
+        ImGui::MenuItem("Resources", nullptr, &m_context.showResources);
         ImGui::Separator();
         if (ImGui::MenuItem("Reset Layout"))
             m_layoutResetRequested = true;
@@ -104,20 +116,29 @@ void EditorUI::LoadSnapshotFromDisk(Curia::Registry& registry) {
 void EditorUI::BuildDefaultLayout(unsigned int dockspaceId) {
     m_context.showStats = true;
     m_context.showSystems = true;
+    m_context.showEntities = true;
+    m_context.showInspector = true;
+    m_context.showArchetypes = true;
+    m_context.showResources = true;
 
     ImGui::DockBuilderRemoveNode(dockspaceId);
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->WorkSize);
 
     ImGuiID center = dockspaceId;
-    ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.25f, nullptr, &center);
-    ImGuiID rightBottom = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.5f, nullptr, &right);
+    ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.18f, nullptr, &center);
+    ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.30f, nullptr, &center);
+    ImGuiID rightBottom = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.45f, nullptr, &right);
 
     ImGui::DockBuilderDockWindow("Viewport", center);
-    ImGui::DockBuilderDockWindow("Stats", right);
+    ImGui::DockBuilderDockWindow("Entities", left);
+    ImGui::DockBuilderDockWindow("Archetypes", left);     // tabbed with Entities
+    ImGui::DockBuilderDockWindow("Inspector", right);
+    ImGui::DockBuilderDockWindow("Stats", rightBottom);   // tabbed group:
     ImGui::DockBuilderDockWindow("Systems", rightBottom);
+    ImGui::DockBuilderDockWindow("Resources", rightBottom);
+    // Session C adds: Log (bottom split under Viewport)
 
     ImGui::DockBuilderFinish(dockspaceId);
 }
-
 } // Lutum

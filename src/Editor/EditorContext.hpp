@@ -14,14 +14,22 @@
 #define LUTUM_EDITORCONTEXT_HPP
 #include <string>
 
+#include "Lutum/ECS/Entity.hpp"
+
 namespace Lutum {
 
 struct EditorContext {
     bool showStats = true;
     bool showSystems = true;
+    bool showEntities = true;
+    bool showInspector = true;
+    bool showArchetypes = true;
+    bool showResources = true;
     bool exitRequested = false;
 
-    // last menu-action result
+    Curia::Entity selectedEntity = Curia::INVALID_ENTITY;
+
+    // Last menu-action result
     std::string statusMessage;
 };
 

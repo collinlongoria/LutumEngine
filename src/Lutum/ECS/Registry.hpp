@@ -129,6 +129,11 @@ public:
         return *resource;
     }
 
+    [[nodiscard]]
+    bool HasResource(ResourceID id) const {
+        return id < m_resources.size() && m_resources[id].ptr != nullptr;
+    }
+
     // --- Snapshot ---
 
     [[nodiscard]]
