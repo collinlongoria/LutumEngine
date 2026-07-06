@@ -10,5 +10,12 @@
 Lutum Engine is a game engine I am making for fun. I have a vision for an engine with best-in-class level design tools.
 That is what I aim to build. It is also using things I have already built in the past, such as Curia ECS.
 
+# Features
+1. A robust 2D and 3D renderer built atop SDL3 and SDL_GPU.
+2. 'Curia', an in-house ECS implementation.
+3. Voxel and Terrain features. (SOON)
+
 # Meaning
 'Lutum' is Latin for dirt.
+
+'Curia' is Latin for council.
