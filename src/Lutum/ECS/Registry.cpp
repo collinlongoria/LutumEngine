@@ -89,6 +89,18 @@ bool Registry::Alive(Entity e) const {
     return record.generation == EntityTraits::Generation(e) && record.archetype != nullptr;
 }
 
+void Registry::Clear() {
+    LUTUM_ASSERT(!m_inObserver, "structural change from inside an observer");
+
+    for (uint32_t index = 0; index < m_directory.size(); ++index) {
+        if (m_directory[index].archetype != nullptr)
+            Destroy(EntityTraits::Make(index, m_directory[index].generation));
+    }
+
+    m_directory.clear();
+    m_freeIndices.clear();
+}
+
 size_t Registry::EntityCount() const {
     return m_directory.size() - m_freeIndices.size();
 }

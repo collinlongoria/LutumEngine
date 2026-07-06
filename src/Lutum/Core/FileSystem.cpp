@@ -27,6 +27,7 @@ namespace {
     struct FileSystemState {
         fs::path engineRoot; // .../EngineAssets
         fs::path contentRoot; // <project>/Content
+        fs::path savedRoot; // <project>/Saved
         std::string projectName;
         bool initialized = false;
         bool projectMounted = false;
@@ -130,6 +131,7 @@ bool MountProject(const char* projectDir) {
     }
 
     state.contentRoot = content;
+    state.savedRoot = root / "Saved"; // created lazily on first write
     state.projectMounted = true;
     LUTUM_INFO("FileSystem: mounted project '{}' at '{}'", state.projectName, root.string());
     return true;
@@ -155,6 +157,10 @@ std::string Resolve(std::string_view virtualPath) {
     else if (rest.rfind("/Game/", 0) == 0) {
         rest.remove_prefix(6);
         root = state.projectMounted ? &state.contentRoot : nullptr;
+    }
+    else if (rest.rfind("/Saved/", 0) == 0) {
+        rest.remove_prefix(7);
+        root = state.projectMounted ? &state.savedRoot : nullptr;
     }
     else if (!rest.empty() && rest.front() == '/') {
         LUTUM_WARN("FileSystem: unknown path prefix in '{}'", virtualPath);
@@ -212,6 +218,42 @@ std::optional<std::string> ReadText(std::string_view virtualPath) {
     if (!bytes)
         return std::nullopt;
     return std::string(bytes->begin(), bytes->end());
+}
+
+bool WriteBytes(std::string_view virtualPath, std::span<const uint8_t> data) {
+    if (virtualPath.rfind("/Engine/", 0) == 0) {
+        LUTUM_ERROR("FileSystem: refusing write to read-only /Engine/ path '{}'", virtualPath);
+        return false;
+    }
+
+    const std::string resolved = Resolve(virtualPath);
+    if (resolved.empty())
+        return false;
+
+    std::error_code ec;
+    fs::create_directories(fs::path(resolved).parent_path(), ec);
+    if (ec) {
+        LUTUM_ERROR("FileSystem: failed to create directories for '{}': {}", virtualPath, ec.message());
+        return false;
+    }
+
+    std::FILE* file = std::fopen(resolved.c_str(), "wb");
+    if (!file) {
+        LUTUM_ERROR("FileSystem: failed to open '{}' for writing", virtualPath);
+        return false;
+    }
+
+    const bool ok = data.empty() || std::fwrite(data.data(), 1, data.size(), file) == data.size();
+    std::fclose(file);
+
+    if (!ok)
+        LUTUM_ERROR("FileSystem: short write on '{}'", virtualPath);
+    return ok;
+}
+
+bool WriteText(std::string_view virtualPath, std::string_view text) {
+    return WriteBytes(virtualPath,
+        std::span(reinterpret_cast<const uint8_t*>(text.data()), text.size()));
 }
 
 } // Lutum::Filesystem

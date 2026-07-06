@@ -46,6 +46,12 @@ public:
     [[nodiscard]]
     bool Alive(Entity e) const;
 
+    // Destroys every entity and resets the entity directory
+    // Archetypes are EMPTIED but never destroyed: persistent queries cache Archetype* and stay valid across Clear
+    // Resources and observers are preserved
+    // NOTE: invalidates ALL outstanding Entity handles
+    void Clear();
+
     // --- Components ---
 
     template <IsValidComponent T>

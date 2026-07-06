@@ -17,11 +17,19 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <span>
 
 namespace Lutum {
 
 /*
  * Project-space file-access system
+ *
+ * virtual prefixes:
+ *      /Engine/ -> EngineAssets/           (read-only at runtime)
+ *      /Game/   -> <project>/Content/      (read/write)
+ *      /Saved/  -> <project>/Saved/        (read/write; editor state, gitignored)
+ *
+ *  NOTE: prefix-less paths resolve against /Game/
  */
 namespace FileSystem {
     // Locates EngineAssets by searching upward from the executable directory
@@ -30,7 +38,7 @@ namespace FileSystem {
     bool Initialize(const char* engineAssetOverride = nullptr);
     void Shutdown();
 
-    // Validates project.lutum and Content/, then roots /Game/ there
+    // Validates project.lutum and Content/, then roots /Game/ and /Saved/ there
     bool MountProject(const char* projectDir);
     [[nodiscard]]
     bool IsProjectMounted();
@@ -48,6 +56,11 @@ namespace FileSystem {
     std::optional<std::vector<uint8_t>> ReadBytes(std::string_view virtualPath);
     [[nodiscard]]
     std::optional<std::string> ReadText(std::string_view virtualPath);
+
+    // Writing: /Game/ and /Saved/ only
+    // parent directories are created as needed
+    bool WriteBytes(std::string_view virtualPath, std::span<const uint8_t> data);
+    bool WriteText(std::string_view virtualPath, std::string_view text);
 } // Filesystem
 
 } // Lutum

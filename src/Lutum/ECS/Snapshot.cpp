@@ -194,7 +194,7 @@ std::vector<uint8_t> Registry::SaveSnapshot() const {
 }
 
 bool Registry::LoadSnapshot(std::span<const uint8_t> bytes) {
-    LUTUM_ASSERT(m_directory.empty() && m_archetypes.size() == 1, "LoadSnapshot: requires a freshly constructed registry");
+    LUTUM_ASSERT(m_directory.empty(), "LoadSnapshot requires an empty registry (freshly constructed or Clear()ed)");
 
     ByteReader r{bytes.data(), bytes.size()};
 

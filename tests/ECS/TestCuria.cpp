@@ -663,3 +663,62 @@ TEST_CASE("snapshot load: failures leave the registry untouched") {
         CHECK_FALSE(dst.LoadSnapshot(bad));
     }
 }
+
+TEST_CASE("Clear: observers fire, archetypes survive, queries stay valid") {
+    Registry r;
+
+    int removals = 0;
+    r.ObserveRemove<Position>([&](Entity) { ++removals; });
+
+    Query<Position> q;
+    for (int i = 0; i < 10; ++i) {
+        Entity e = r.Create();
+        r.Add(e, Position{static_cast<float>(i), 0, 0});
+        if (i % 2 == 0) r.Add(e, Velocity{1, 1, 1});
+    }
+    q.Refresh(r);
+    const size_t archCountBefore = r.ArchetypeCount();
+
+    r.Clear();
+
+    CHECK(removals == 10);
+    CHECK(r.EntityCount() == 0);
+    CHECK(r.ArchetypeCount() == archCountBefore); // emptied, not destroyed
+
+    int visited = 0;
+    q.Each([&](Position&) { ++visited; });
+    CHECK(visited == 0);
+
+    // Repopulate: the SAME cached archetypes refill; no Refresh needed
+    Entity e = r.Create();
+    CHECK(EntityTraits::Index(e) == 0);           // directory restarted
+    r.Add(e, Position{42, 0, 0});
+    q.Each([&](Position& p) { ++visited; CHECK(p.x == 42); });
+    CHECK(visited == 1);
+}
+
+TEST_CASE("Clear + LoadSnapshot: load-over-live round trip") {
+    Registry r;
+
+    Entity a = r.Create();
+    r.Add(a, Position{1, 2, 3});
+    r.Add<Frozen>(a);
+    Entity b = r.Create();
+    r.Add(b, Velocity{4, 5, 6});
+    const std::vector<uint8_t> bytes = r.SaveSnapshot();
+
+    // Mutate past the save point, then load back over the live registry
+    r.Destroy(b);
+    Entity c = r.Create();
+    r.Add(c, Position{9, 9, 9});
+
+    r.Clear();
+    REQUIRE(r.LoadSnapshot(bytes));
+
+    CHECK(r.SaveSnapshot() == bytes);             // byte-identical through Clear
+    REQUIRE(r.Alive(a));
+    REQUIRE(r.Alive(b));
+    CHECK(r.Get<Position>(a)->z == 3);
+    CHECK(r.Has<Frozen>(a));
+    CHECK(r.Get<Velocity>(b)->x == 4);
+}
