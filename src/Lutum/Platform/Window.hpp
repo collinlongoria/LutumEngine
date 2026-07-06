@@ -44,6 +44,7 @@ public:
 
     [[nodiscard]]
     bool ShouldClose() const { return m_shouldClose; }
+    void RequestClose() { m_shouldClose = true; }
     void PollEvents();
 
     [[nodiscard]]
