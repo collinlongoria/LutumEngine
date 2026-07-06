@@ -118,6 +118,7 @@ add_library(LutumCore STATIC
         src/Lutum/Core/FileSystem.hpp
         src/Lutum/ECS/Resource.cpp
         src/Lutum/ECS/Snapshot.cpp
+        src/Lutum/ECS/Reflect.hpp
 )
 target_include_directories(LutumCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(LutumCore PUBLIC

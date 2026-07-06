@@ -15,6 +15,8 @@
 #include <chrono>
 #include <thread>
 
+#include <imgui.h>
+
 #include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Core/Jobs.hpp"
 #include "Lutum/Core/Log.hpp"
@@ -76,6 +78,15 @@ bool Application::Initialize(const char* projectPath) {
 
     if (!Debug::UI::Initialize(*m_graphicsDevice))
         return false;
+
+    const bool firstRun = !FileSystem::Exists("/Saved/imgui.ini");
+    if (FileSystem::EnsureDirectory("/Saved/")) {
+        m_imguiIniPath = FileSystem::Resolve("/Saved/imgui.ini");
+        if (!m_imguiIniPath.empty())
+            ImGui::GetIO().IniFilename = m_imguiIniPath.c_str();
+    }
+    if (firstRun)
+        m_editorUI.RequestLayoutReset();
 
     m_window->SetEventHook([](const SDL_Event& event) {
         Debug::UI::ProcessEvent(event);

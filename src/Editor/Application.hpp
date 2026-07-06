@@ -51,6 +51,8 @@ private:
     RenderTarget m_sceneTarget;
     EditorUI m_editorUI;
 
+    std::string m_imguiIniPath;
+
     bool m_shutdown = false;
 };
 } // Lutum

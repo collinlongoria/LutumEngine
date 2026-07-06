@@ -136,6 +136,17 @@ public:
     [[nodiscard]]
     bool LoadSnapshot(std::span<const uint8_t> bytes);
 
+    // --- Untyped access (reflection/tooling path) ---
+
+    // null if dead
+    [[nodiscard]]
+    const Archetype* ArchetypeOf(Entity e) const;
+
+    [[nodiscard]]
+    void* GetRaw(Entity e, ComponentID cid);
+    [[nodiscard]]
+    const void* GetRaw(Entity e, ComponentID cid) const;
+
 private:
     struct EntityRecord {
         Archetype* archetype = nullptr;

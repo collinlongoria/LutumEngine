@@ -12,8 +12,12 @@
 
 #ifndef LUTUM_CAMERA_HPP
 #define LUTUM_CAMERA_HPP
+#include <array>
+#include <cstddef>
+
 #include "Lutum/Core/Math.hpp"
 #include "Lutum/Scene/Transform.hpp"
+#include "Lutum/ECS/Reflect.hpp"
 
 namespace Lutum {
 
@@ -24,6 +28,16 @@ struct CameraComponent {
     float aspect = 16.0f / 9.0f; // overwritten each frame from WindowInfo
     float nearPlane = 0.1f;
     float farPlane = 1000.0f;
+
+    static constexpr auto CuriaFields() {
+        using namespace Curia;
+        return std::array{
+            FieldInfo{"fovY",      offsetof(CameraComponent, fovY),      FieldType::F32, 1},
+            FieldInfo{"aspect",    offsetof(CameraComponent, aspect),    FieldType::F32, 1},
+            FieldInfo{"nearPlane", offsetof(CameraComponent, nearPlane), FieldType::F32, 1},
+            FieldInfo{"farPlane",  offsetof(CameraComponent, farPlane),  FieldType::F32, 1},
+        };
+    }
 };
 
 // Tag: marks the camera the renderer uses
@@ -40,6 +54,17 @@ struct FlyCam {
     float moveSpeed = 5.0f;
     float sprintMultiplier = 4.0f;
     float lookSensitivity = 0.0025f;
+
+    static constexpr auto CuriaFields() {
+        using namespace Curia;
+        return std::array{
+            FieldInfo{"yaw", offsetof(FlyCam, yaw), FieldType::F32, 1},
+            FieldInfo{"pitch", offsetof(FlyCam, pitch), FieldType::F32, 1},
+            FieldInfo{"moveSpeed", offsetof(FlyCam, moveSpeed), FieldType::F32, 1},
+            FieldInfo{"sprintMultiplier",offsetof(FlyCam, sprintMultiplier), FieldType::F32, 1},
+            FieldInfo{"lookSensitivity", offsetof(FlyCam, lookSensitivity), FieldType::F32, 1},
+        };
+    }
 };
 
 namespace CameraMath {

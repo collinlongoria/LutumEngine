@@ -15,6 +15,7 @@
 #include <format>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Core/Log.hpp"
@@ -27,7 +28,12 @@ static constexpr const char* kSnapshotPath = "/Game/scene.lsnap";
 
 void EditorUI::Draw(Curia::Registry& registry, Curia::Scheduler& scheduler, RenderTarget& sceneTarget) {
     DrawMainMenuBar(registry);
-    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+
+    const ImGuiID dockspaceId = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+    if (m_layoutResetRequested) {
+        BuildDefaultLayout(dockspaceId);
+        m_layoutResetRequested = false;
+    }
 
     m_viewportPanel.Draw(registry, sceneTarget);
     if (m_context.showStats)
@@ -54,6 +60,9 @@ void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
     if (ImGui::BeginMenu("View")) {
         ImGui::MenuItem("Stats", nullptr, &m_context.showStats);
         ImGui::MenuItem("Systems", nullptr, &m_context.showSystems);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Reset Layout"))
+            m_layoutResetRequested = true;
         ImGui::EndMenu();
     }
 
@@ -91,4 +100,24 @@ void EditorUI::LoadSnapshotFromDisk(Curia::Registry& registry) {
         m_context.statusMessage = "Snapshot load FAILED: incompatible data (scene restored)";
     }
 }
+
+void EditorUI::BuildDefaultLayout(unsigned int dockspaceId) {
+    m_context.showStats = true;
+    m_context.showSystems = true;
+
+    ImGui::DockBuilderRemoveNode(dockspaceId);
+    ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->WorkSize);
+
+    ImGuiID center = dockspaceId;
+    ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.25f, nullptr, &center);
+    ImGuiID rightBottom = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.5f, nullptr, &right);
+
+    ImGui::DockBuilderDockWindow("Viewport", center);
+    ImGui::DockBuilderDockWindow("Stats", right);
+    ImGui::DockBuilderDockWindow("Systems", rightBottom);
+
+    ImGui::DockBuilderFinish(dockspaceId);
+}
+
 } // Lutum

@@ -31,7 +31,14 @@ public:
     [[nodiscard]]
     const EditorContext& Context() const { return m_context; }
 
+    // Rebuild the default dock layout on the next Draw (first run / View menu)
+    void RequestLayoutReset() { m_layoutResetRequested = true; }
+
 private:
+    void BuildDefaultLayout(unsigned int dockspaceId);
+
+    bool m_layoutResetRequested = false;
+
     void DrawMainMenuBar(Curia::Registry& registry);
     void SaveSnapshotToDisk(Curia::Registry& registry);
     void LoadSnapshotFromDisk(Curia::Registry& registry);

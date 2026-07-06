@@ -61,6 +61,9 @@ namespace FileSystem {
     // parent directories are created as needed
     bool WriteBytes(std::string_view virtualPath, std::span<const uint8_t> data);
     bool WriteText(std::string_view virtualPath, std::string_view text);
+
+    // Creates a directory (and parents) for a virtual path
+    bool EnsureDirectory(std::string_view virtualPath);
 } // Filesystem
 
 } // Lutum

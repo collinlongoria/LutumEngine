@@ -17,6 +17,8 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
+#include <array>
+#include <cstddef>
 
 #include "Lutum/Core/Jobs.hpp"
 #include "Lutum/ECS/CommandBuffer.hpp"
@@ -64,6 +66,26 @@ struct Frozen {
 struct MeshHandle {
     static constexpr const char* kCuriaName = "Test.MeshHandle";
     uint32_t id;
+};
+
+struct Reflected {
+    static constexpr const char* kCuriaName = "Test.Reflected";
+
+    float x;
+    uint16_t id;
+    bool active;
+    float arr[3];
+    Entity target;
+
+    static constexpr auto CuriaFields() {
+        return std::array{
+            FieldInfo{"x",      offsetof(Reflected, x),      FieldType::F32,       1},
+            FieldInfo{"id",     offsetof(Reflected, id),     FieldType::U16,       1},
+            FieldInfo{"active", offsetof(Reflected, active), FieldType::Bool,      1},
+            FieldInfo{"arr",    offsetof(Reflected, arr),    FieldType::F32,       3},
+            FieldInfo{"target", offsetof(Reflected, target), FieldType::EntityRef, 1},
+        };
+    }
 };
 
 struct CuriaJobsFixture {
@@ -721,4 +743,63 @@ TEST_CASE("Clear + LoadSnapshot: load-over-live round trip") {
     CHECK(r.Get<Position>(a)->z == 3);
     CHECK(r.Has<Frozen>(a));
     CHECK(r.Get<Velocity>(b)->x == 4);
+}
+
+TEST_CASE("reflection: field tables registered and validated") {
+    const ComponentID cid = ComponentType<Reflected>::Id();
+    const ComponentInfo& info = ComponentRegistry::Get(cid);
+
+    REQUIRE(info.fields.size() == 5);
+    CHECK(info.fields[0].name == std::string("x"));
+    CHECK(info.fields[0].offset == offsetof(Reflected, x));
+    CHECK(info.fields[3].type == FieldType::F32);
+    CHECK(info.fields[3].count == 3);
+    CHECK(info.fields[4].type == FieldType::EntityRef);
+    CHECK(FieldTypeSize(info.fields[4].type) == sizeof(Entity));
+
+    // Unreflected components have empty tables
+    CHECK(ComponentRegistry::Get(ComponentType<Position>::Id()).fields.empty());
+    CHECK(ComponentRegistry::Get(ComponentType<DeadTag>::Id()).fields.empty());
+}
+
+TEST_CASE("reflection: untyped access via ArchetypeOf + GetRaw") {
+    Registry r;
+    Entity target = r.Create();
+    Entity e = r.Create();
+    r.Add(e, Reflected{1.5f, 42, true, {7, 8, 9}, target});
+    r.Add(e, Position{1, 2, 3});
+    r.Add<DeadTag>(e);
+
+    const Archetype* arch = r.ArchetypeOf(e);
+    REQUIRE(arch != nullptr);
+    CHECK(arch->Signature().size() == 3);
+
+    const ComponentID cid = ComponentType<Reflected>::Id();
+    void* raw = r.GetRaw(e, cid);
+    REQUIRE(raw != nullptr);
+
+    // Walk fields generically, the way the inspector will
+    const ComponentInfo& info = ComponentRegistry::Get(cid);
+    for (const FieldInfo& f : info.fields) {
+        std::byte* fieldPtr = static_cast<std::byte*>(raw) + f.offset;
+        if (f.name == std::string("x")) {
+            float v;
+            std::memcpy(&v, fieldPtr, sizeof(v));
+            CHECK(v == 1.5f);
+            const float newV = 99.0f; // write-through, like an edit widget
+            std::memcpy(fieldPtr, &newV, sizeof(newV));
+        }
+        if (f.name == std::string("target")) {
+            Entity t;
+            std::memcpy(&t, fieldPtr, sizeof(t));
+            CHECK(t == target);
+        }
+    }
+    CHECK(r.Get<Reflected>(e)->x == 99.0f); // raw write visible through typed access
+
+    CHECK(r.GetRaw(e, ComponentType<DeadTag>::Id()) == nullptr);   // tag
+    CHECK(r.GetRaw(e, ComponentType<Velocity>::Id()) == nullptr);  // absent
+    r.Destroy(e);
+    CHECK(r.GetRaw(e, cid) == nullptr);                            // dead
+    CHECK(r.ArchetypeOf(e) == nullptr);
 }

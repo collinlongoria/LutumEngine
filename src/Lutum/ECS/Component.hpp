@@ -17,6 +17,10 @@
 #include <optional>
 #include <string>
 #include <type_traits>
+#include <span>
+#include <vector>
+
+#include "Lutum/ECS/Reflect.hpp"
 
 namespace Lutum::Curia {
 
@@ -37,13 +41,14 @@ struct ComponentInfo {
     size_t size = 0;
     size_t alignment = 1;
     std::string name; // for debugging / tooling
+    std::vector<FieldInfo> fields;
 };
 
 // Global component metadata, indexed by ComponentID
 namespace ComponentRegistry {
     // NOTE: re-registering an existing key returns its ID
     // NOTE: will assert on layout mismatch and on hash collision
-    ComponentID Register(StableKey key, const char* name, size_t size, size_t alignment);
+    ComponentID Register(StableKey key, const char* name, size_t size, size_t alignment, std::span<const FieldInfo> fields = {});
     [[nodiscard]]
     const ComponentInfo& Get(ComponentID id);
     // unknown keys resolve to nullopt
@@ -56,9 +61,13 @@ namespace ComponentRegistry {
 // Every component must declare its serialized identity
 // NOTE: The NAME STRING, not the type, is the stable identity (renaming it will break saves)
 template<typename T>
-concept HasStableName = requires
-{
+concept HasStableName = requires {
     { T::kCuriaName } -> std::convertible_to<const char*>;
+};
+
+template<typename T>
+concept HasFieldTable = requires {
+    T::CuriaFields();
 };
 
 template<typename T>
@@ -70,12 +79,21 @@ concept IsValidComponent =
 template<IsValidComponent T>
 struct ComponentType {
     static ComponentID Id() {
-        static const ComponentID id = ComponentRegistry::Register(
-            HashName(T::kCuriaName),
-            T::kCuriaName,
-            std::is_empty_v<T> ? 0 : sizeof(T),
-            std::is_empty_v<T> ? 1 : alignof(T)
-        );
+        static const ComponentID id = []() {
+            constexpr size_t size = std::is_empty_v<T> ? 0 : sizeof(T);
+            constexpr size_t alignment = std::is_empty_v<T> ? 1 : alignof(T);
+
+            if constexpr (HasFieldTable<T>) {
+                static constexpr auto kFields = T::CuriaFields();
+                return ComponentRegistry::Register(
+                    HashName(T::kCuriaName), T::kCuriaName, size, alignment,
+                    std::span<const FieldInfo>(kFields.data(), kFields.size()));
+            }
+            else {
+                return ComponentRegistry::Register(
+                    HashName(T::kCuriaName), T::kCuriaName, size, alignment);
+            }
+        }();
         return id;
     }
 

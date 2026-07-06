@@ -33,7 +33,7 @@ namespace {
 } // anonymous namespace
 
 namespace ComponentRegistry {
-    ComponentID Register(StableKey key, const char* name, size_t size, size_t alignment) {
+    ComponentID Register(StableKey key, const char* name, size_t size, size_t alignment, std::span<const FieldInfo> fields) {
         RegistryState& state = State();
         std::lock_guard lock(state.mutex);
 
@@ -41,11 +41,17 @@ namespace ComponentRegistry {
             const ComponentInfo& existing = state.infos[it->second];
             LUTUM_ASSERT(existing.name == name, "stable-key hash collision: '{}' vs '{}' (key {:#018x})", existing.name, name, key);
             LUTUM_ASSERT(existing.size == size && existing.alignment == alignment, "layout mismatch on re-register of '{}' ({}B/{} vs {}B/{})", name, existing.size, existing.alignment, size, alignment);
+            LUTUM_ASSERT(existing.fields.size() == fields.size(), "field-table mismatch on re-register of '{}'", name);
             return it->second;
         }
 
+        for (const FieldInfo& f : fields) {
+            LUTUM_ASSERT(f.name != nullptr && f.count >= 1, "bad field descriptor in '{}'", name);
+            LUTUM_ASSERT(f.offset + FieldTypeSize(f.type) * f.count <= size, "field '{}::{}' overruns the component ({} + {}*{} > {})", name, f.name, f.offset, FieldTypeSize(f.type), f.count, size);
+        }
+
         const ComponentID id = static_cast<ComponentID>(state.infos.size());
-        state.infos.push_back(ComponentInfo{key, size, alignment, std::string(name)});
+        state.infos.push_back(ComponentInfo{key, size, alignment, std::string(name), std::vector<FieldInfo>(fields.begin(), fields.end())});
         state.byKey.emplace(key, id);
         return id;
     }

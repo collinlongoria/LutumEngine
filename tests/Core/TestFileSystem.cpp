@@ -70,3 +70,20 @@ TEST_CASE("FileSystem: write policy") {
     CHECK_FALSE(FileSystem::WriteBytes("/Game/../escape.bin", payload)); // unsafe path
     CHECK_FALSE(FileSystem::WriteBytes("/Bogus/x.bin", payload));        // unknown prefix
 }
+
+TEST_CASE("FileSystem: EnsureDirectory and root resolves") {
+    FileSystemFixture fx;
+
+    CHECK(FileSystem::EnsureDirectory("/Saved/"));
+    CHECK(fs::is_directory(fx.root / "Project" / "Saved"));
+    CHECK(FileSystem::EnsureDirectory("/Saved/")); // idempotent
+    CHECK(FileSystem::EnsureDirectory("/Game/Levels/Deep/Nested"));
+    CHECK(fs::is_directory(fx.root / "Project" / "Content" / "Levels" / "Deep" / "Nested"));
+
+    CHECK_FALSE(FileSystem::EnsureDirectory("/Engine/nope"));
+
+    INFO("Resolved: " << FileSystem::Resolve("/Saved/"));
+    INFO("Expected: " << (fx.root / "Project" / "Saved").string());
+
+    CHECK(fs::weakly_canonical(FileSystem::Resolve("/Saved/")) == fs::weakly_canonical(fx.root / "Project" / "Saved"));
+}

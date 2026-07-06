@@ -89,6 +89,33 @@ bool Registry::Alive(Entity e) const {
     return record.generation == EntityTraits::Generation(e) && record.archetype != nullptr;
 }
 
+const Archetype* Registry::ArchetypeOf(Entity e) const {
+    if (!Alive(e))
+        return nullptr;
+    return m_directory[EntityTraits::Index(e)].archetype;
+}
+
+void* Registry::GetRaw(Entity e, ComponentID cid) {
+    if (!Alive(e))
+        return nullptr;
+
+    EntityRecord& record = m_directory[EntityTraits::Index(e)];
+    Archetype* arch = record.archetype;
+    if (!arch->HasComponent(cid))
+        return nullptr;
+
+    const size_t size = arch->ComponentSize(cid);
+    if (size == 0)
+        return nullptr; // tags carry no data
+
+    Slab* slab = arch->GetSlab(record.slabIndex);
+    return slab->data + arch->ComponentOffset(cid) + record.rowIndex * size;
+}
+
+const void* Registry::GetRaw(Entity e, ComponentID cid) const {
+    return const_cast<Registry*>(this)->GetRaw(e, cid);
+}
+
 void Registry::Clear() {
     LUTUM_ASSERT(!m_inObserver, "structural change from inside an observer");
 

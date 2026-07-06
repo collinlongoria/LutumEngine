@@ -174,7 +174,7 @@ std::string Resolve(std::string_view virtualPath) {
         LUTUM_WARN("FileSystem: root not mounted for '{}'", virtualPath);
         return {};
     }
-    if (!IsPathSafe(rest)) {
+    if (!rest.empty() && !IsPathSafe(rest)) {
         LUTUM_WARN("FileSystem: rejected unsafe path '{}'", virtualPath);
         return {};
     }
@@ -254,6 +254,25 @@ bool WriteBytes(std::string_view virtualPath, std::span<const uint8_t> data) {
 bool WriteText(std::string_view virtualPath, std::string_view text) {
     return WriteBytes(virtualPath,
         std::span(reinterpret_cast<const uint8_t*>(text.data()), text.size()));
+}
+
+bool EnsureDirectory(std::string_view virtualPath) {
+    if (virtualPath.rfind("/Engine/", 0) == 0) {
+        LUTUM_ERROR("FileSystem: refusing to create directory under read-only /Engine/ ('{}')", virtualPath);
+        return false;
+    }
+
+    const std::string resolved = Resolve(virtualPath);
+    if (resolved.empty())
+        return false;
+
+    std::error_code ec;
+    fs::create_directories(resolved, ec);
+    if (ec) {
+        LUTUM_ERROR("FileSystem: failed to create directory '{}': {}", virtualPath, ec.message());
+        return false;
+    }
+    return true;
 }
 
 } // Lutum::Filesystem
