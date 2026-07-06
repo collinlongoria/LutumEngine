@@ -13,9 +13,11 @@
 #include "Editor/Application.hpp"
 
 #include <chrono>
-#include <thread>
+#include <filesystem>
 
 #include <imgui.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_process.h>
 
 #include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Core/Jobs.hpp"
@@ -37,7 +39,9 @@ Application::~Application() {
     Shutdown();
 }
 
-bool Application::Initialize(const char* projectPath) {
+bool Application::Initialize(const char* projectPath, const char* executablePath) {
+    m_executablePath = executablePath ? executablePath : "";
+
     Log::Initialize();
     Jobs::Initialize();
 
@@ -45,6 +49,15 @@ bool Application::Initialize(const char* projectPath) {
         return false;
     if (!FileSystem::MountProject(projectPath))
         return false;
+
+    m_projectPath = std::filesystem::absolute(projectPath).string();
+    auto recent = LoadRecentProjects();
+    AddRecentProject(recent, m_projectPath);
+    SaveRecentProjects(recent);
+    m_editorUI.SetRecentProjects(recent);
+
+    m_settings = EditorSettings::Load();
+    m_settings.ApplyTo(m_editorUI.Context());
 
     m_platform = std::make_unique<Lutum::PlatformContext>();
     if (!m_platform->IsValid())
@@ -88,8 +101,10 @@ bool Application::Initialize(const char* projectPath) {
     if (firstRun)
         m_editorUI.RequestLayoutReset();
 
-    m_window->SetEventHook([](const SDL_Event& event) {
+    m_window->SetEventHook([this](const SDL_Event& event) {
         Debug::UI::ProcessEvent(event);
+        if (event.type == SDL_EVENT_MOUSE_WHEEL)
+            m_registry.GetResource<Input>().AddWheelDelta(event.wheel.y);
     });
 
     // Resources
@@ -103,11 +118,13 @@ bool Application::Initialize(const char* projectPath) {
     m_scheduler.LogGraph();
 
     // Camera entity
-    Curia::Entity camera = m_registry.Create();
-    m_registry.Add(camera, Transform{Vec3(0.0f, 0.0f, 2.0f)});
-    m_registry.Add(camera, CameraComponent{});
-    m_registry.Add(camera, FlyCam{});
-    m_registry.Add<ActiveCamera>(camera);
+    m_cameraEntity = m_registry.Create();
+    m_registry.Add(m_cameraEntity, Transform{Vec3(0.0f, 0.0f, 2.0f)});
+    m_registry.Add(m_cameraEntity, CameraComponent{});
+    FlyCam fly{};
+    fly.moveSpeed = m_settings.cameraMoveSpeed;
+    m_registry.Add(m_cameraEntity, fly);
+    m_registry.Add<ActiveCamera>(m_cameraEntity);
 
     m_registry.GetResource<Input>().SetRelativeMouseMode(*m_window, false);
 
@@ -136,7 +153,20 @@ void Application::Run() {
         Debug::UI::BeginFrame();
         m_editorUI.Draw(m_registry, m_scheduler, m_sceneTarget); // writes ViewportInfo, resizes target
 
-        if (m_editorUI.Context().exitRequested)
+        EditorContext& ctx = m_editorUI.Context();
+        if (!ctx.relaunchProjectPath.empty()) {
+            if (!m_executablePath.empty()) {
+                const char* args[] = {m_executablePath.c_str(),
+                                      ctx.relaunchProjectPath.c_str(), nullptr};
+                if (SDL_Process* child = SDL_CreateProcess(args, false))
+                    SDL_DestroyProcess(child); // detach; does not kill the child
+                else
+                    LUTUM_ERROR("Relaunch failed: {}", SDL_GetError());
+            }
+            ctx.relaunchProjectPath.clear();
+            m_window->RequestClose();
+        }
+        if (ctx.exitRequested)
             m_window->RequestClose();
 
         m_scheduler.Run();
@@ -152,6 +182,13 @@ void Application::Run() {
 void Application::Shutdown() {
     if (m_shutdown) return;
     m_shutdown = true;
+
+    if (FileSystem::IsProjectMounted()) {
+        m_settings.CaptureFrom(m_editorUI.Context());
+        if (const FlyCam* fly = m_registry.Get<FlyCam>(m_cameraEntity))
+            m_settings.cameraMoveSpeed = fly->moveSpeed;
+        m_settings.Save();
+    }
 
     Debug::UI::Shutdown();
 

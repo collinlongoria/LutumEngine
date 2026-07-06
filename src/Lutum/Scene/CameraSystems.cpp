@@ -46,8 +46,12 @@ void RegisterCameraSystems(Curia::Scheduler& scheduler) {
                 if (input.IsRelativeMouseMode()) {
                     const Vec2 delta = input.MouseDelta();
                     fly.yaw -= delta.x * fly.lookSensitivity;
-                    fly.pitch = glm::clamp(fly.pitch - delta.y * fly.lookSensitivity,
-                                           -kPitchLimit, kPitchLimit);
+                    fly.pitch = glm::clamp(fly.pitch - delta.y * fly.lookSensitivity, -kPitchLimit, kPitchLimit);
+
+                    // Scroll adjusts fly speed
+                    const float wheel = input.WheelDelta();
+                    if (wheel != 0.0f)
+                    fly.moveSpeed = glm::clamp(fly.moveSpeed * std::pow(1.15f, wheel), 0.1f, 200.0f);
                 }
 
                 transform.rotation =

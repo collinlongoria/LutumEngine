@@ -48,6 +48,8 @@ void EditorUI::Draw(Curia::Registry& registry, Curia::Scheduler& scheduler, Rend
         m_archetypesPanel.Draw(registry, m_context);
     if (m_context.showResources)
         m_resourcesPanel.Draw(registry, m_context);
+    if (m_context.showLog)
+        m_logPanel.Draw(m_context);
 }
 
 void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
@@ -59,6 +61,13 @@ void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
             SaveSnapshotToDisk(registry);
         if (ImGui::MenuItem("Load Snapshot", nullptr, false, FileSystem::Exists(kSnapshotPath)))
             LoadSnapshotFromDisk(registry);
+        if (ImGui::BeginMenu("Recent Projects", !m_recentProjects.empty())) {
+            for (const std::string& path : m_recentProjects) {
+                if (ImGui::MenuItem(path.c_str()))
+                    m_context.relaunchProjectPath = path; // Application relaunches
+            }
+            ImGui::EndMenu();
+        }
         ImGui::Separator();
         if (ImGui::MenuItem("Exit"))
             m_context.exitRequested = true;
@@ -72,6 +81,7 @@ void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
         ImGui::MenuItem("Inspector", nullptr, &m_context.showInspector);
         ImGui::MenuItem("Archetypes", nullptr, &m_context.showArchetypes);
         ImGui::MenuItem("Resources", nullptr, &m_context.showResources);
+        ImGui::MenuItem("Log", nullptr, &m_context.showLog);
         ImGui::Separator();
         if (ImGui::MenuItem("Reset Layout"))
             m_layoutResetRequested = true;
@@ -120,6 +130,7 @@ void EditorUI::BuildDefaultLayout(unsigned int dockspaceId) {
     m_context.showInspector = true;
     m_context.showArchetypes = true;
     m_context.showResources = true;
+    m_context.showLog = true;
 
     ImGui::DockBuilderRemoveNode(dockspaceId);
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
@@ -129,6 +140,7 @@ void EditorUI::BuildDefaultLayout(unsigned int dockspaceId) {
     ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.18f, nullptr, &center);
     ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.30f, nullptr, &center);
     ImGuiID rightBottom = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.45f, nullptr, &right);
+    ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
 
     ImGui::DockBuilderDockWindow("Viewport", center);
     ImGui::DockBuilderDockWindow("Entities", left);
@@ -137,7 +149,7 @@ void EditorUI::BuildDefaultLayout(unsigned int dockspaceId) {
     ImGui::DockBuilderDockWindow("Stats", rightBottom);   // tabbed group:
     ImGui::DockBuilderDockWindow("Systems", rightBottom);
     ImGui::DockBuilderDockWindow("Resources", rightBottom);
-    // Session C adds: Log (bottom split under Viewport)
+    ImGui::DockBuilderDockWindow("Log", bottom);
 
     ImGui::DockBuilderFinish(dockspaceId);
 }

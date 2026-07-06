@@ -18,7 +18,7 @@ int main(int argc, char ** argv) {
     const char* projectPath = (argc > 1) ? argv[1] : "LutumProject";
 
     Lutum::Application app;
-    if (!app.Initialize(projectPath))
+    if (!app.Initialize(projectPath, argv[0]))
         return EXIT_FAILURE;
 
     app.Run();

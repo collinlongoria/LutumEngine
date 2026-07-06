@@ -17,8 +17,10 @@
 #include <source_location>
 #include <string_view>
 #include <utility>
+#include <string>
+#include <vector>
 
-#include "../Debug/DebugTools.hpp"
+#include "Lutum/Debug/DebugTools.hpp"
 
 // Compile-time floor
 // 0=Trace 1=Debug 2=Info 3=Warn 4=Error 5=Fatal
@@ -43,6 +45,11 @@ enum class LogLevel : uint8_t {
 };
 
 namespace Log {
+    struct RingEntry {
+        LogLevel level = LogLevel::Info;
+        std::string text; // formatted line, identical to file output
+    };
+
     // Call once at startup, before other systems
     // NOTE: safe to log before Initialize; output just goes to console only
     bool Initialize(const char* filePath = "Lutum.log");
@@ -62,6 +69,8 @@ namespace Log {
 
         Write(level, std::format(fmt, std::forward<Args>(args)...), loc);
     }
+
+    uint64_t ReadRing(uint64_t sinceSerial, std::vector<RingEntry>& out);
 } // Log
 } // Lutum
 

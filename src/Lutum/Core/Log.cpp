@@ -17,11 +17,13 @@
 #include <cstdio>
 #include <ctime>
 #include <mutex>
+#include <algorithm>
 
 #include <SDL3/SDL_log.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #endif
 
@@ -32,6 +34,9 @@ namespace {
         std::mutex writeMutex;
         std::atomic<LogLevel> level{LogLevel::Trace};
         std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+        static constexpr size_t kRingCapacity = 1024;
+        std::vector<Log::RingEntry> ring{kRingCapacity};
+        uint64_t serial = 0; // total messages ever written
     };
 
     LogState& State() {
@@ -219,7 +224,21 @@ namespace Log {
                     std::fflush(state.file); // don't lose warnings/errors on crash
                 }
             }
+
+            state.ring[state.serial % LogState::kRingCapacity] = RingEntry{level, line};
+            ++state.serial;
         }
+    }
+
+    uint64_t ReadRing(uint64_t sinceSerial, std::vector<RingEntry>& out) {
+        LogState& state = State();
+        std::lock_guard lock(state.writeMutex);
+
+        const uint64_t oldest = state.serial > LogState::kRingCapacity
+            ? state.serial - LogState::kRingCapacity : 0;
+        for (uint64_t s = std::max(sinceSerial, oldest); s < state.serial; ++s)
+            out.push_back(state.ring[s % LogState::kRingCapacity]);
+        return state.serial;
     }
 }
 } // Lutum

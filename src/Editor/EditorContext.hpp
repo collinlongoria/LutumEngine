@@ -26,6 +26,9 @@ struct EditorContext {
     bool showArchetypes = true;
     bool showResources = true;
     bool exitRequested = false;
+    bool showLog = true;
+    // Set by the Recent Projects menu; Application relaunches and exits
+    std::string relaunchProjectPath;
 
     Curia::Entity selectedEntity = Curia::INVALID_ENTITY;
 

@@ -64,6 +64,11 @@ public:
     [[nodiscard]]
     Vec2 MouseDelta() const { return m_mouseDelta; }
 
+    // Scroll wheel, in notches
+    void AddWheelDelta(float y) { m_wheelAccum += y; }
+    [[nodiscard]]
+    float WheelDelta() const { return m_wheelDelta; }
+
     // Captures the cursor and hides it
     void SetRelativeMouseMode(Window& window, bool enabled);
     [[nodiscard]]
@@ -78,6 +83,9 @@ private:
 
     Vec2 m_mouseDelta = Vec2(0.0f);
     bool m_relativeMode = false;
+
+    float m_wheelAccum = 0.0f;
+    float m_wheelDelta = 0.0f;
 
 };
 } // Lutum

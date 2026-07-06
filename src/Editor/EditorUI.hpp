@@ -21,6 +21,7 @@
 #include "Editor/Panels/EntitiesPanel.hpp"
 #include "Editor/Panels/InspectorPanel.hpp"
 #include "Editor/Panels/ResourcesPanel.hpp"
+#include "Editor/Panels/LogPanel.hpp"
 
 namespace Lutum {
 class RenderTarget;
@@ -37,6 +38,14 @@ public:
 
     // Rebuild the default dock layout on the next Draw (first run / View menu)
     void RequestLayoutReset() { m_layoutResetRequested = true; }
+
+    // Non-const context: Application applies settings / reads relaunch requests
+    [[nodiscard]]
+    EditorContext& Context() { return m_context; }
+
+    void SetRecentProjects(std::vector<std::string> projects) {
+        m_recentProjects = std::move(projects);
+    }
 
 private:
     void BuildDefaultLayout(unsigned int dockspaceId);
@@ -55,6 +64,9 @@ private:
     InspectorPanel m_inspectorPanel;
     ArchetypesPanel m_archetypesPanel;
     ResourcesPanel m_resourcesPanel;
+    LogPanel m_logPanel;
+
+    std::vector<std::string> m_recentProjects;
 };
 } // Lutum
 

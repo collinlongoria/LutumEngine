@@ -15,6 +15,7 @@
 
 #include <memory>
 
+#include "EditorSettings.hpp"
 #include "Lutum/ECS/Registry.hpp"
 #include "Lutum/ECS/Scheduler.hpp"
 #include "Editor/EditorUI.hpp"
@@ -35,7 +36,7 @@ public:
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
 
-    bool Initialize(const char* projectPath);
+    bool Initialize(const char* projectPath, const char* executablePath);
     void Run();
     void Shutdown();
 
@@ -52,6 +53,11 @@ private:
     EditorUI m_editorUI;
 
     std::string m_imguiIniPath;
+
+    EditorSettings m_settings;
+    Curia::Entity m_cameraEntity = Curia::INVALID_ENTITY;
+    std::string m_projectPath;
+    std::string m_executablePath;
 
     bool m_shutdown = false;
 };

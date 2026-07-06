@@ -244,6 +244,10 @@ if(LUTUM_BUILD_EDITOR)
             src/Editor/Panels/ArchetypesPanel.cpp
             src/Editor/Panels/ResourcesPanel.hpp
             src/Editor/Panels/ResourcesPanel.cpp
+            src/Editor/EditorSettings.hpp
+            src/Editor/EditorSettings.cpp
+            src/Editor/Panels/LogPanel.hpp
+            src/Editor/Panels/LogPanel.cpp
     )
     target_link_libraries(LutumEditor PRIVATE LutumEngine)
 endif()

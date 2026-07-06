@@ -52,6 +52,9 @@ static SDL_Scancode ToSDLScancode(Key key) {
 }
 
 void Input::Update() {
+    m_wheelDelta = m_wheelAccum;
+    m_wheelAccum = 0.0f;
+
     std::memcpy(m_prevKeys, m_keys, sizeof(m_keys));
     std::memcpy(m_prevMouseButtons, m_mouseButtons, sizeof(m_mouseButtons));
 
