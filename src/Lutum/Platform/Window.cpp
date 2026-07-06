@@ -84,4 +84,12 @@ int Window::DrawableWidth() const {
     SDL_GetWindowSizeInPixels(m_window, &width, nullptr);
     return width;
 }
+
+void Window::Maximize() {
+    SDL_MaximizeWindow(m_window);
+}
+
+bool Window::IsMaximized() const {
+    return (SDL_GetWindowFlags(m_window) & SDL_WINDOW_MAXIMIZED) != 0;
+}
 } // Lutum

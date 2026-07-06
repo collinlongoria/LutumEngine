@@ -21,6 +21,18 @@
 #include "Lutum/Core/Log.hpp"
 #include "Lutum/ECS/Registry.hpp"
 
+namespace {
+// Proportionally rescale every node's SizeRef
+void ScaleDockTree(ImGuiDockNode* node, float sx, float sy) {
+    if (!node)
+        return;
+    node->SizeRef.x *= sx;
+    node->SizeRef.y *= sy;
+    ScaleDockTree(node->ChildNodes[0], sx, sy);
+    ScaleDockTree(node->ChildNodes[1], sx, sy);
+}
+} // anonymous namespace
+
 namespace Lutum {
 
 // TODO: replace with dynamic path later
@@ -29,11 +41,31 @@ static constexpr const char* kSnapshotPath = "/Game/scene.lsnap";
 void EditorUI::Draw(Curia::Registry& registry, Curia::Scheduler& scheduler, RenderTarget& sceneTarget) {
     DrawMainMenuBar(registry);
 
-    const ImGuiID dockspaceId = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+    const ImGuiID dockspaceId = ImHashStr("LutumDockSpace");
+    const ImVec2 work = ImGui::GetMainViewport()->WorkSize;
+
     if (m_layoutResetRequested) {
         BuildDefaultLayout(dockspaceId);
         m_layoutResetRequested = false;
+        m_lastWorkWidth = work.x;
+        m_lastWorkHeight = work.y;
     }
+    else if (work.x > 0.0f && work.y > 0.0f) {
+        if (ImGuiDockNode* root = ImGui::DockBuilderGetNode(dockspaceId)) {
+            const bool changed = std::fabs(work.x - m_lastWorkWidth) > 0.5f ||
+                                 std::fabs(work.y - m_lastWorkHeight) > 0.5f;
+            if (m_lastWorkWidth > 0.0f && changed)
+                ScaleDockTree(root, work.x / m_lastWorkWidth, work.y / m_lastWorkHeight);
+            m_lastWorkWidth = work.x;
+            m_lastWorkHeight = work.y;
+        }
+        else if (m_lastWorkWidth <= 0.0f) {
+            m_lastWorkWidth = work.x;
+            m_lastWorkHeight = work.y;
+        }
+    }
+
+    ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
 
     m_viewportPanel.Draw(registry, sceneTarget);
     if (m_context.showStats)
@@ -136,20 +168,22 @@ void EditorUI::BuildDefaultLayout(unsigned int dockspaceId) {
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->WorkSize);
 
+    // Mirrors the hand-arranged layout: bottom strip first (root Y split),
+    // then Inspector column, then the left tab column; Viewport stays central.
     ImGuiID center = dockspaceId;
-    ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.18f, nullptr, &center);
-    ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.30f, nullptr, &center);
-    ImGuiID rightBottom = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.45f, nullptr, &right);
-    ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
+    ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.20f, nullptr, &center);
+    ImGuiID bottomRight = ImGui::DockBuilderSplitNode(bottom, ImGuiDir_Right, 0.20f, nullptr, &bottom);
+    ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.28f, nullptr, &center);
+    ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.29f, nullptr, &center);
 
     ImGui::DockBuilderDockWindow("Viewport", center);
-    ImGui::DockBuilderDockWindow("Entities", left);
-    ImGui::DockBuilderDockWindow("Archetypes", left);     // tabbed with Entities
+    ImGui::DockBuilderDockWindow("Entities", left);    // tab group, Entities in front
+    ImGui::DockBuilderDockWindow("Archetypes", left);
+    ImGui::DockBuilderDockWindow("Systems", left);
+    ImGui::DockBuilderDockWindow("Resources", left);
     ImGui::DockBuilderDockWindow("Inspector", right);
-    ImGui::DockBuilderDockWindow("Stats", rightBottom);   // tabbed group:
-    ImGui::DockBuilderDockWindow("Systems", rightBottom);
-    ImGui::DockBuilderDockWindow("Resources", rightBottom);
     ImGui::DockBuilderDockWindow("Log", bottom);
+    ImGui::DockBuilderDockWindow("Stats", bottomRight);
 
     ImGui::DockBuilderFinish(dockspaceId);
 }

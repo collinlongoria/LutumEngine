@@ -29,6 +29,12 @@ struct EditorSettings {
     bool showResources = true;
     bool showLog = true;
 
+    float layoutWorkWidth = 0.0f;
+    float layoutWorkHeight = 0.0f;
+    int windowWidth = 1280;
+    int windowHeight = 720;
+    bool windowMaximized = false;
+
     static EditorSettings Load();
     void Save() const;
 

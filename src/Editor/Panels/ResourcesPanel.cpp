@@ -21,7 +21,7 @@
 namespace Lutum {
 
 void ResourcesPanel::Draw(Curia::Registry& registry, EditorContext& context) {
-    if (ImGui::Begin("Resources", &context.showResources)) {
+    if (ImGui::Begin("Resources", &context.showResources, ImGuiWindowFlags_HorizontalScrollbar)) {
         const uint32_t count = Curia::ResourceRegistry::Count();
         for (Curia::ResourceID id = 0; id < count; ++id) {
             const bool set = registry.HasResource(id);

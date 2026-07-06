@@ -50,7 +50,17 @@ EditorSettings EditorSettings::Load() {
         else if (key == "panel.archetypes") s.showArchetypes = (value == "1");
         else if (key == "panel.resources")  s.showResources  = (value == "1");
         else if (key == "panel.log")        s.showLog        = (value == "1");
+        else if (key == "layout.workWidth")  s.layoutWorkWidth  = std::strtof(value.c_str(), nullptr);
+        else if (key == "layout.workHeight") s.layoutWorkHeight = std::strtof(value.c_str(), nullptr);
+        else if (key == "window.width")      s.windowWidth  = std::atoi(value.c_str());
+        else if (key == "window.height")     s.windowHeight = std::atoi(value.c_str());
+        else if (key == "window.maximized")  s.windowMaximized = (value == "1");
     }
+
+    // clamp
+    s.windowWidth = std::max(s.windowWidth, 640);
+    s.windowHeight = std::max(s.windowHeight, 480);
+
     return s;
 }
 
@@ -64,6 +74,11 @@ void EditorSettings::Save() const {
     out += std::format("panel.archetypes={}\n", showArchetypes ? 1 : 0);
     out += std::format("panel.resources={}\n",  showResources  ? 1 : 0);
     out += std::format("panel.log={}\n",        showLog        ? 1 : 0);
+    out += std::format("layout.workWidth={}\n", layoutWorkWidth);
+    out += std::format("layout.workHeight={}\n", layoutWorkHeight);
+    out += std::format("window.width={}\n", windowWidth);
+    out += std::format("window.height={}\n", windowHeight);
+    out += std::format("window.maximized={}\n", windowMaximized ? 1 : 0);
     FileSystem::WriteText(kSettingsPath, out);
 }
 

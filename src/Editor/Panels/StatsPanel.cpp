@@ -21,7 +21,7 @@
 namespace Lutum {
 
 void StatsPanel::Draw(Curia::Registry& registry, EditorContext& context) {
-    if (ImGui::Begin("Stats", &context.showStats)) {
+    if (ImGui::Begin("Stats", &context.showStats, ImGuiWindowFlags_HorizontalScrollbar)) {
         const Time& time = registry.GetResource<Time>();
         ImGui::Text("Frame: %.2f ms (%.0f fps)",
                     time.DeltaSeconds() * 1000.0f,

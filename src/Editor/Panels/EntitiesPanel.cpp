@@ -35,7 +35,7 @@ std::string SignatureLabel(const Curia::Archetype& arch) {
 }
 
 void EntitiesPanel::Draw(Curia::Registry& registry, EditorContext& context) {
-    if (ImGui::Begin("Entities", &context.showEntities)) {
+    if (ImGui::Begin("Entities", &context.showEntities, ImGuiWindowFlags_HorizontalScrollbar)) {
         const auto& archetypes = registry.Archetypes();
         for (size_t a = 0; a < archetypes.size(); ++a) {
             const Curia::Archetype& arch = *archetypes[a];

@@ -63,9 +63,20 @@ bool Application::Initialize(const char* projectPath, const char* executablePath
     if (!m_platform->IsValid())
         return false;
 
-    m_window = std::make_unique<Lutum::Window>("Lutum", 1280, 720);
+    SDL_Rect usable;
+    if (SDL_GetDisplayUsableBounds(SDL_GetPrimaryDisplay(), &usable)) {
+        m_settings.windowWidth = std::min(m_settings.windowWidth, usable.w);
+        m_settings.windowHeight = std::min(m_settings.windowHeight, usable.h);
+    }
+
+    m_window = std::make_unique<Lutum::Window>("Lutum",
+        m_settings.windowWidth, m_settings.windowHeight);
     if (!m_window)
         return false;
+    if (m_settings.windowMaximized)
+        m_window->Maximize();
+
+    m_editorUI.SetLayoutWorkSize(m_settings.layoutWorkWidth, m_settings.layoutWorkHeight);
 
     m_graphicsDevice = std::make_unique<Lutum::GraphicsDevice>(*m_window);
     if (!m_graphicsDevice)
@@ -146,9 +157,19 @@ void Application::Run() {
 
         // Editor fly controls
         const ViewportInfo& viewport = m_registry.GetResource<ViewportInfo>();
-        const bool wantFly = viewport.hovered && input.IsMouseButtonDown(MouseButton::RIGHT);
-        if (wantFly != input.IsRelativeMouseMode())
-            input.SetRelativeMouseMode(*m_window, wantFly);
+        const bool rmbDown = input.IsMouseButtonDown(MouseButton::RIGHT);
+        if (!input.IsRelativeMouseMode()) {
+            if (viewport.hovered && rmbDown)
+                input.SetRelativeMouseMode(*m_window, true);
+        }
+        else if (!rmbDown) {
+            input.SetRelativeMouseMode(*m_window, false);
+        }
+        ImGuiIO& io = ImGui::GetIO();
+        if (input.IsRelativeMouseMode())
+            io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
+        else
+            io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
 
         Debug::UI::BeginFrame();
         m_editorUI.Draw(m_registry, m_scheduler, m_sceneTarget); // writes ViewportInfo, resizes target
@@ -187,6 +208,14 @@ void Application::Shutdown() {
         m_settings.CaptureFrom(m_editorUI.Context());
         if (const FlyCam* fly = m_registry.Get<FlyCam>(m_cameraEntity))
             m_settings.cameraMoveSpeed = fly->moveSpeed;
+
+        m_settings.layoutWorkWidth = m_editorUI.LayoutWorkWidth();
+        m_settings.layoutWorkHeight = m_editorUI.LayoutWorkHeight();
+        m_settings.windowMaximized = m_window->IsMaximized();
+        if (!m_settings.windowMaximized) {
+            m_settings.windowWidth = m_window->Width();
+            m_settings.windowHeight = m_window->Height();
+        }
         m_settings.Save();
     }
 

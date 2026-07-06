@@ -82,6 +82,8 @@ private:
     bool m_prevMouseButtons[static_cast<int>(MouseButton::COUNT)] = {};
 
     Vec2 m_mouseDelta = Vec2(0.0f);
+    float m_savedMouseX = 0.0f;
+    float m_savedMouseY = 0.0f;
     bool m_relativeMode = false;
 
     float m_wheelAccum = 0.0f;

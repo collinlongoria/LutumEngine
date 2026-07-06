@@ -57,6 +57,9 @@ public:
     int DrawableHeight() const;
     [[nodiscard]]
     bool IsMinimized() const { return m_minimized; }
+    void Maximize();
+    [[nodiscard]]
+    bool IsMaximized() const;
 
     // Called for every SDL event before Window's own handling.
     void SetEventHook(std::function<void(const SDL_Event&)> hook) { m_eventHook = std::move(hook); }

@@ -27,7 +27,7 @@ namespace Lutum {
 using namespace Curia;
 
 void InspectorPanel::Draw(Registry& registry, EditorContext& context) {
-    if (ImGui::Begin("Inspector", &context.showInspector)) {
+    if (ImGui::Begin("Inspector", &context.showInspector, ImGuiWindowFlags_HorizontalScrollbar)) {
         const Entity e = context.selectedEntity;
         if (e == INVALID_ENTITY || !registry.Alive(e)) {
             ImGui::TextDisabled(e == INVALID_ENTITY ? "No entity selected" : "Selected entity is dead");

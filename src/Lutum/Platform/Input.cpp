@@ -93,14 +93,24 @@ bool Input::WasMouseButtonPressed(MouseButton button) const {
     return m_mouseButtons[i] && !m_prevMouseButtons[i];
 }
 
-void Input::SetRelativeMouseMode(Window &window, bool enabled) {
+void Input::SetRelativeMouseMode(Window& window, bool enabled) {
+    if (enabled == m_relativeMode)
+        return;
+
+    // The OS cursor can drift during relative mode
+    if (enabled)
+        SDL_GetMouseState(&m_savedMouseX, &m_savedMouseY);
+
     if (!SDL_SetWindowRelativeMouseMode(window.NativeHandle(), enabled)) {
         SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
         return;
     }
     m_relativeMode = enabled;
 
-    // Flush accumulated delta so the camera doesn't jump on capture
+    if (!enabled)
+        SDL_WarpMouseInWindow(window.NativeHandle(), m_savedMouseX, m_savedMouseY);
+
+    // Flush accumulated delta
     float dx, dy;
     SDL_GetRelativeMouseState(&dx, &dy);
     m_mouseDelta = Vec2(0.0f);

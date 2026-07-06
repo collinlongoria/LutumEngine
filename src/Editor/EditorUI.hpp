@@ -47,6 +47,10 @@ public:
         m_recentProjects = std::move(projects);
     }
 
+    void SetLayoutWorkSize(float w, float h) { m_lastWorkWidth = w; m_lastWorkHeight = h; }
+    [[nodiscard]] float LayoutWorkWidth() const { return m_lastWorkWidth; }
+    [[nodiscard]] float LayoutWorkHeight() const { return m_lastWorkHeight; }
+
 private:
     void BuildDefaultLayout(unsigned int dockspaceId);
 
@@ -67,6 +71,9 @@ private:
     LogPanel m_logPanel;
 
     std::vector<std::string> m_recentProjects;
+
+    float m_lastWorkWidth = 0.0f;
+    float m_lastWorkHeight = 0.0f;
 };
 } // Lutum
 

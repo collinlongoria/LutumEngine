@@ -22,7 +22,7 @@
 namespace Lutum {
 
 void ArchetypesPanel::Draw(Curia::Registry& registry, EditorContext& context) {
-    if (ImGui::Begin("Archetypes", &context.showArchetypes)) {
+    if (ImGui::Begin("Archetypes", &context.showArchetypes, ImGuiWindowFlags_HorizontalScrollbar)) {
         const auto& archetypes = registry.Archetypes();
         for (size_t a = 0; a < archetypes.size(); ++a) {
             const Curia::Archetype& arch = *archetypes[a];

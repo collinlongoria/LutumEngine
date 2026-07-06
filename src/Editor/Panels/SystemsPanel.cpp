@@ -42,7 +42,7 @@ namespace {
 } // anonymous namespace
 
 void SystemsPanel::Draw(Curia::Scheduler& scheduler, EditorContext& context) {
-    if (ImGui::Begin("Systems", &context.showSystems)) {
+    if (ImGui::Begin("Systems", &context.showSystems, ImGuiWindowFlags_HorizontalScrollbar)) {
         const size_t phaseCount = scheduler.PhaseCount();
         for (size_t phase = 0; phase < phaseCount; ++phase) {
             ImGui::SeparatorText(("Phase " + std::to_string(phase)).c_str());
