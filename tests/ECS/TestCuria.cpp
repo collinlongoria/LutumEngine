@@ -25,6 +25,7 @@
 #include "Lutum/ECS/Query.hpp"
 #include "Lutum/ECS/Registry.hpp"
 #include "Lutum/ECS/Scheduler.hpp"
+#include "Lutum/Scene/Name.hpp"
 
 namespace {
 
@@ -802,4 +803,166 @@ TEST_CASE("reflection: untyped access via ArchetypeOf + GetRaw") {
     r.Destroy(e);
     CHECK(r.GetRaw(e, cid) == nullptr);                            // dead
     CHECK(r.ArchetypeOf(e) == nullptr);
+}
+
+TEST_CASE("Curia: untyped structural ops") {
+    Registry reg;
+    const ComponentID posId = ComponentType<Position>::Id();
+    const ComponentID tagId = ComponentType<Frozen>::Id();
+
+    SUBCASE("AddRaw with data matches typed Add") {
+        Entity a = reg.Create();
+        Entity b = reg.Create();
+        reg.Add<Position>(a, {1, 2, 3});
+        Position p{1, 2, 3};
+        reg.AddRaw(b, posId, &p);
+
+        CHECK(reg.ArchetypeOf(a) == reg.ArchetypeOf(b));
+        CHECK(reg.Get<Position>(b)->x == 1.0f);
+        CHECK(reg.Get<Position>(b)->z == 3.0f);
+    }
+
+    SUBCASE("AddRaw null data writes the default blob") {
+        Entity e = reg.Create();
+        reg.AddRaw(e, posId, nullptr);
+        REQUIRE(reg.Has<Position>(e));
+        // Position has no NSDMIs -> value-init default is all zeroes
+        CHECK(reg.Get<Position>(e)->x == 0.0f);
+        CHECK(reg.Get<Position>(e)->y == 0.0f);
+    }
+
+    SUBCASE("AddRaw is a no-op when present; RemoveRaw when absent") {
+        Entity e = reg.Create();
+        reg.Add<Position>(e, {5, 5, 5});
+        reg.AddRaw(e, posId, nullptr); // must NOT overwrite
+        CHECK(reg.Get<Position>(e)->x == 5.0f);
+
+        reg.RemoveRaw(e, tagId); // absent: no-op, no crash
+        CHECK(reg.Has<Position>(e));
+    }
+
+    SUBCASE("RemoveRaw removes and fires observers") {
+        int removes = 0;
+        reg.ObserveRemove<Position>([&](Entity) { removes++; });
+
+        Entity e = reg.Create();
+        reg.Add<Position>(e);
+        reg.RemoveRaw(e, posId);
+        CHECK(!reg.Has<Position>(e));
+        CHECK(removes == 1);
+    }
+
+    SUBCASE("AddRaw fires add observers") {
+        int adds = 0;
+        reg.ObserveAdd<Position>([&](Entity) { adds++; });
+        Entity e = reg.Create();
+        reg.AddRaw(e, posId, nullptr);
+        CHECK(adds == 1);
+    }
+
+    SUBCASE("tags via untyped path") {
+        Entity e = reg.Create();
+        reg.AddRaw(e, tagId, nullptr);
+        CHECK(reg.Has<Frozen>(e));
+        reg.RemoveRaw(e, tagId);
+        CHECK(!reg.Has<Frozen>(e));
+    }
+}
+
+TEST_CASE("Curia: Duplicate") {
+    Registry reg;
+
+    SUBCASE("deep copy, source untouched") {
+        Entity src = reg.Create();
+        reg.Add<Position>(src, {1, 2, 3});
+        reg.Add<Velocity>(src, {4, 5, 6});
+        reg.Add<Frozen>(src);
+
+        Entity dup = reg.Duplicate(src);
+        REQUIRE(dup != src);
+        REQUIRE(reg.Alive(dup));
+        CHECK(reg.ArchetypeOf(dup) == reg.ArchetypeOf(src));
+        CHECK(reg.Get<Position>(dup)->y == 2.0f);
+        CHECK(reg.Get<Velocity>(dup)->z == 6.0f);
+        CHECK(reg.Has<Frozen>(dup));
+
+        reg.Get<Position>(dup)->x = 99.0f;
+        CHECK(reg.Get<Position>(src)->x == 1.0f); // independent storage
+    }
+
+    SUBCASE("duplicate of an empty entity") {
+        Entity src = reg.Create();
+        Entity dup = reg.Duplicate(src);
+        CHECK(reg.Alive(dup));
+        CHECK(reg.ArchetypeOf(dup)->Signature().empty());
+    }
+
+    SUBCASE("add observers fire per component after data is copied") {
+        int posAdds = 0;
+        float seenX = -1.0f;
+        reg.ObserveAdd<Position>([&](Entity e) {
+            posAdds++;
+            seenX = reg.Get<Position>(e)->x;
+        });
+
+        Entity src = reg.Create();
+        reg.Add<Position>(src, {7, 0, 0});
+        posAdds = 0; // ignore the source's add
+
+        (void)reg.Duplicate(src);
+        CHECK(posAdds == 1);
+        CHECK(seenX == 7.0f); // data was already in place
+    }
+}
+
+TEST_CASE("Curia: Char fields and Name") {
+    Registry reg;
+
+    SUBCASE("registration and layout") {
+        const ComponentID cid = ComponentType<Lutum::Name>::Id();
+        const ComponentInfo& info = ComponentRegistry::Get(cid);
+        CHECK(info.size == sizeof(Lutum::Name));
+        REQUIRE(info.fields.size() == 1);
+        CHECK(info.fields[0].type == FieldType::Char);
+        CHECK(info.fields[0].count == Lutum::Name::kCapacity);
+    }
+
+    SUBCASE("default blob is an empty string") {
+        Entity e = reg.Create();
+        reg.AddRaw(e, ComponentType<Lutum::Name>::Id(), nullptr);
+        REQUIRE(reg.Has<Lutum::Name>(e));
+        CHECK(reg.Get<Lutum::Name>(e)->value[0] == '\0');
+    }
+
+    SUBCASE("MakeName truncates and terminates") {
+        const Lutum::Name n = Lutum::MakeName(
+            "this string is definitely longer than thirty-two characters");
+        CHECK(n.value[Lutum::Name::kCapacity - 1] == '\0');
+        CHECK(std::strlen(n.value) == Lutum::Name::kCapacity - 1);
+    }
+
+    SUBCASE("survives Duplicate and snapshot round-trip") {
+        Entity e = reg.Create();
+        reg.Add<Lutum::Name>(e, Lutum::MakeName("Crate"));
+
+        Entity dup = reg.Duplicate(e);
+        CHECK(std::strcmp(reg.Get<Lutum::Name>(dup)->value, "Crate") == 0);
+
+        const auto bytes = reg.SaveSnapshot();
+        Registry reg2;
+        REQUIRE(reg2.LoadSnapshot(bytes));
+        // find the named entities in reg2
+        int found = 0;
+        for (const auto& arch : reg2.Archetypes()) {
+            if (!arch->HasComponent(ComponentType<Lutum::Name>::Id()))
+                continue;
+            for (uint32_t s = 0; s < arch->SlabCount(); ++s)
+                for (uint32_t r = 0; r < arch->GetSlab(s)->entityCount; ++r) {
+                    const Entity ent = arch->EntityAt(s, r);
+                    if (std::strcmp(reg2.Get<Lutum::Name>(ent)->value, "Crate") == 0)
+                        found++;
+                }
+        }
+        CHECK(found == 2);
+    }
 }

@@ -152,6 +152,12 @@ public:
     [[nodiscard]]
     const void* GetRaw(Entity e, ComponentID cid) const;
 
+    void AddRaw(Entity e, ComponentID cid, const void* data = nullptr);
+    void RemoveRaw(Entity e, ComponentID cid);
+
+    [[nodiscard]]
+    Entity Duplicate(Entity src);
+
 private:
     struct EntityRecord {
         Archetype* archetype = nullptr;
@@ -188,71 +194,15 @@ private:
 
 template<IsValidComponent T>
 void Registry::Add(Entity e, T componentData) {
-    LUTUM_ASSERT(!m_inObserver, "structural change from inside an observer");
-    LUTUM_ASSERT(Alive(e), "Add on dead entity");
-
-    EntityRecord& record = m_directory[EntityTraits::Index(e)];
-    const ComponentID cid = ComponentType<T>::Id();
-
-    if (record.archetype->HasComponent(cid))
-        return;
-
-    Archetype* dst = nullptr;
-    if (auto it = record.archetype->addEdges.find(cid); it != record.archetype->addEdges.end()) {
-        dst = it->second;
-    }
-    else {
-        std::vector<ComponentID> newSig = record.archetype->Signature();
-        newSig.insert(std::lower_bound(newSig.begin(), newSig.end(), cid), cid);
-
-        dst = FindOrCreateArchetype(std::move(newSig));
-
-        record.archetype->addEdges[cid] = dst;
-        dst->removeEdges[cid] = record.archetype;
-    }
-
-    MoveEntity(e, record, dst);
-
-    if constexpr (!std::is_empty_v<T>) {
-        dst->WriteComponent(cid, dst->GetSlab(record.slabIndex), record.rowIndex, &componentData);
-    }
-
-    NotifyAdd(cid, e);
+    if constexpr (std::is_empty_v<T>)
+        AddRaw(e, ComponentType<T>::Id(), nullptr);
+    else
+        AddRaw(e, ComponentType<T>::Id(), &componentData);
 }
 
 template<IsValidComponent T>
 void Registry::Remove(Entity e) {
-    LUTUM_ASSERT(!m_inObserver, "structural change from inside an observer");
-    LUTUM_ASSERT(Alive(e), "Remove on dead entity");
-
-    EntityRecord& record = m_directory[EntityTraits::Index(e)];
-    const ComponentID cid = ComponentType<T>::Id();
-
-    if (!record.archetype->HasComponent(cid))
-        return;
-
-    // Before the data disappears
-    NotifyRemove(cid, e);
-
-    Archetype* dst = nullptr;
-    if (auto it = record.archetype->removeEdges.find(cid); it != record.archetype->removeEdges.end()) {
-        dst = it->second;
-    }
-    else {
-        std::vector<ComponentID> newSig;
-        newSig.reserve(record.archetype->Signature().size() - 1);
-        for (ComponentID c : record.archetype->Signature()) {
-            if (c != cid)
-                newSig.push_back(c);
-        }
-
-        dst = newSig.empty() ? m_emptyArchetype : FindOrCreateArchetype(std::move(newSig));
-
-        record.archetype->removeEdges[cid] = dst;
-        dst->addEdges[cid] = record.archetype;
-    }
-
-    MoveEntity(e, record, dst);
+    RemoveRaw(e, ComponentType<T>::Id());
 }
 
 template <IsValidComponent T>

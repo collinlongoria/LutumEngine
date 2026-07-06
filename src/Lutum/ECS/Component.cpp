@@ -33,7 +33,7 @@ namespace {
 } // anonymous namespace
 
 namespace ComponentRegistry {
-    ComponentID Register(StableKey key, const char* name, size_t size, size_t alignment, std::span<const FieldInfo> fields) {
+    ComponentID Register(StableKey key, const char* name, size_t size, size_t alignment, std::span<const FieldInfo> fields, const void* defaultData) {
         RegistryState& state = State();
         std::lock_guard lock(state.mutex);
 
@@ -50,8 +50,13 @@ namespace ComponentRegistry {
             LUTUM_ASSERT(f.offset + FieldTypeSize(f.type) * f.count <= size, "field '{}::{}' overruns the component ({} + {}*{} > {})", name, f.name, f.offset, FieldTypeSize(f.type), f.count, size);
         }
 
+        std::vector<uint8_t> defaults(size, 0);
+        if (size > 0 && defaultData != nullptr)
+            std::memcpy(defaults.data(), defaultData, size);
+
         const ComponentID id = static_cast<ComponentID>(state.infos.size());
-        state.infos.push_back(ComponentInfo{key, size, alignment, std::string(name), std::vector<FieldInfo>(fields.begin(), fields.end())});
+        state.infos.push_back(ComponentInfo{key, size, alignment, std::string(name),
+            std::vector<FieldInfo>(fields.begin(), fields.end()), std::move(defaults)});
         state.byKey.emplace(key, id);
         return id;
     }

@@ -198,6 +198,7 @@ add_library(LutumScene STATIC
         src/Lutum/Scene/Camera.hpp
         src/Lutum/Scene/CameraSystems.cpp
         src/Lutum/Scene/CameraSystems.hpp
+        src/Lutum/Scene/Name.hpp
 )
 target_link_libraries(LutumScene PUBLIC
         LutumCore

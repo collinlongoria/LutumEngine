@@ -42,13 +42,14 @@ struct ComponentInfo {
     size_t alignment = 1;
     std::string name; // for debugging / tooling
     std::vector<FieldInfo> fields;
+    std::vector<uint8_t> defaultValue;
 };
 
 // Global component metadata, indexed by ComponentID
 namespace ComponentRegistry {
     // NOTE: re-registering an existing key returns its ID
     // NOTE: will assert on layout mismatch and on hash collision
-    ComponentID Register(StableKey key, const char* name, size_t size, size_t alignment, std::span<const FieldInfo> fields = {});
+    ComponentID Register(StableKey key, const char* name, size_t size, size_t alignment, std::span<const FieldInfo> fields = {}, const void* defaultData = nullptr);
     [[nodiscard]]
     const ComponentInfo& Get(ComponentID id);
     // unknown keys resolve to nullopt
@@ -83,15 +84,18 @@ struct ComponentType {
             constexpr size_t size = std::is_empty_v<T> ? 0 : sizeof(T);
             constexpr size_t alignment = std::is_empty_v<T> ? 1 : alignof(T);
 
+            const T defaults{};
+            const void* defaultData = std::is_empty_v<T> ? nullptr : static_cast<const void*>(&defaults);
+
             if constexpr (HasFieldTable<T>) {
                 static constexpr auto kFields = T::CuriaFields();
                 return ComponentRegistry::Register(
                     HashName(T::kCuriaName), T::kCuriaName, size, alignment,
-                    std::span<const FieldInfo>(kFields.data(), kFields.size()));
+                    std::span<const FieldInfo>(kFields.data(), kFields.size()), defaultData);
             }
             else {
                 return ComponentRegistry::Register(
-                    HashName(T::kCuriaName), T::kCuriaName, size, alignment);
+                    HashName(T::kCuriaName), T::kCuriaName, size, alignment, {}, defaultData);
             }
         }();
         return id;

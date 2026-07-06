@@ -31,6 +31,7 @@
 #include "Lutum/Platform/Window.hpp"
 #include "Lutum/Scene/Camera.hpp"
 #include "Lutum/Scene/CameraSystems.hpp"
+#include "Lutum/Scene/Name.hpp"
 #include "Lutum/Scene/Transform.hpp"
 
 namespace Lutum {
@@ -136,6 +137,8 @@ bool Application::Initialize(const char* projectPath, const char* executablePath
     fly.moveSpeed = m_settings.cameraMoveSpeed;
     m_registry.Add(m_cameraEntity, fly);
     m_registry.Add<ActiveCamera>(m_cameraEntity);
+    Name name = MakeName("Cammy the Camera");
+    m_registry.Add(m_cameraEntity, name);
 
     m_registry.GetResource<Input>().SetRelativeMouseMode(*m_window, false);
 

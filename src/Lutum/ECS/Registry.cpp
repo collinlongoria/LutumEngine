@@ -195,4 +195,99 @@ void Registry::NotifyRemove(ComponentID cid, Entity e) {
     m_inObserver = false;
 }
 
+void Registry::AddRaw(Entity e, ComponentID cid, const void* data) {
+    LUTUM_ASSERT(!m_inObserver, "structural change from inside an observer");
+    LUTUM_ASSERT(Alive(e), "AddRaw on dead entity");
+    LUTUM_ASSERT(cid < ComponentRegistry::Count(), "AddRaw with unregistered ComponentID {}", cid);
+
+    EntityRecord& record = m_directory[EntityTraits::Index(e)];
+    if (record.archetype->HasComponent(cid))
+        return;
+
+    Archetype* dst = nullptr;
+    if (auto it = record.archetype->addEdges.find(cid); it != record.archetype->addEdges.end()) {
+        dst = it->second;
+    }
+    else {
+        std::vector<ComponentID> newSig = record.archetype->Signature();
+        newSig.insert(std::lower_bound(newSig.begin(), newSig.end(), cid), cid);
+
+        dst = FindOrCreateArchetype(std::move(newSig));
+
+        record.archetype->addEdges[cid] = dst;
+        dst->removeEdges[cid] = record.archetype;
+    }
+
+    MoveEntity(e, record, dst);
+
+    const ComponentInfo& info = ComponentRegistry::Get(cid);
+    if (info.size > 0) {
+        const void* src = data != nullptr ? data : info.defaultValue.data();
+        dst->WriteComponent(cid, dst->GetSlab(record.slabIndex), record.rowIndex, src);
+    }
+
+    NotifyAdd(cid, e);
+}
+
+void Registry::RemoveRaw(Entity e, ComponentID cid) {
+    LUTUM_ASSERT(!m_inObserver, "structural change from inside an observer");
+    LUTUM_ASSERT(Alive(e), "RemoveRaw on dead entity");
+
+    EntityRecord& record = m_directory[EntityTraits::Index(e)];
+    if (!record.archetype->HasComponent(cid))
+        return;
+
+    // Before the data disappears
+    NotifyRemove(cid, e);
+
+    Archetype* dst = nullptr;
+    if (auto it = record.archetype->removeEdges.find(cid); it != record.archetype->removeEdges.end()) {
+        dst = it->second;
+    }
+    else {
+        std::vector<ComponentID> newSig;
+        newSig.reserve(record.archetype->Signature().size() - 1);
+        for (ComponentID c : record.archetype->Signature()) {
+            if (c != cid)
+                newSig.push_back(c);
+        }
+
+        dst = newSig.empty() ? m_emptyArchetype : FindOrCreateArchetype(std::move(newSig));
+
+        record.archetype->removeEdges[cid] = dst;
+        dst->addEdges[cid] = record.archetype;
+    }
+
+    MoveEntity(e, record, dst);
+}
+
+Entity Registry::Duplicate(Entity src) {
+    LUTUM_ASSERT(!m_inObserver, "structural change from inside an observer");
+    LUTUM_ASSERT(Alive(src), "Duplicate on dead entity");
+
+    const Entity e = Create();
+
+    // NOTE: this MUST happen only AFTER Create()
+    EntityRecord& dstRecord = m_directory[EntityTraits::Index(e)];
+    const EntityRecord& srcRecord = m_directory[EntityTraits::Index(src)];
+    Archetype* arch = srcRecord.archetype;
+
+    if (!arch->Signature().empty()) {
+        MoveEntity(e, dstRecord, arch);
+
+        const Slab* srcSlab = arch->GetSlab(srcRecord.slabIndex);
+        Slab* dstSlab = arch->GetSlab(dstRecord.slabIndex);
+
+        for (ComponentID cid : arch->Signature()) {
+            Archetype::CopyComponent(cid, *arch, dstSlab, dstRecord.rowIndex, *arch, srcSlab, srcRecord.rowIndex);
+        }
+
+        for (ComponentID cid : arch->Signature()) {
+            NotifyAdd(cid, e);
+        }
+    }
+
+    return e;
+}
+
 } // Lutum::Curia

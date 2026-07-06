@@ -12,6 +12,7 @@
 
 #include "Editor/Panels/InspectorPanel.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -27,8 +28,14 @@ namespace Lutum {
 using namespace Curia;
 
 void InspectorPanel::Draw(Registry& registry, EditorContext& context) {
+    bool hasPendingAdd = false;
+    bool hasPendingRemove = false;
+    ComponentID pendingAdd = 0;
+    ComponentID pendingRemove = 0;
+    Entity e = INVALID_ENTITY;
+
     if (ImGui::Begin("Inspector", &context.showInspector, ImGuiWindowFlags_HorizontalScrollbar)) {
-        const Entity e = context.selectedEntity;
+        e = context.selectedEntity;
         if (e == INVALID_ENTITY || !registry.Alive(e)) {
             ImGui::TextDisabled(e == INVALID_ENTITY ? "No entity selected" : "Selected entity is dead");
             ImGui::End();
@@ -43,12 +50,25 @@ void InspectorPanel::Draw(Registry& registry, EditorContext& context) {
             const ComponentInfo& info = ComponentRegistry::Get(cid);
             ImGui::PushID(static_cast<int>(cid));
 
-            if (ImGui::CollapsingHeader(info.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+            const bool open = ImGui::CollapsingHeader(info.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+
+            // Must follow the header immediately: binds to the last item's ID
+            if (ImGui::BeginPopupContextItem()) {
+                if (ImGui::MenuItem("Remove Component")) {
+                    hasPendingRemove = true;
+                    pendingRemove = cid;
+                }
+                ImGui::EndPopup();
+            }
+
+            if (open) {
                 if (info.size == 0) {
                     ImGui::TextDisabled("(tag)");
-                } else if (info.fields.empty()) {
+                }
+                else if (info.fields.empty()) {
                     ImGui::TextDisabled("(no reflected fields, %zu bytes)", info.size);
-                } else {
+                }
+                else {
                     std::byte* base = static_cast<std::byte*>(registry.GetRaw(e, cid));
                     for (size_t i = 0; i < info.fields.size(); ++i) {
                         ImGui::PushID(static_cast<int>(i));
@@ -59,11 +79,50 @@ void InspectorPanel::Draw(Registry& registry, EditorContext& context) {
             }
             ImGui::PopID();
         }
+
+        ImGui::Separator();
+        if (ImGui::Button("Add Component", ImVec2(-FLT_MIN, 0.0f)))
+            ImGui::OpenPopup("AddComponent");
+
+        if (ImGui::BeginPopup("AddComponent")) {
+            // Every registered component the entity doesn't have, alphabetical
+            std::vector<ComponentID> candidates;
+            const uint32_t count = ComponentRegistry::Count();
+            for (ComponentID cid = 0; cid < count; ++cid) {
+                if (!arch->HasComponent(cid))
+                    candidates.push_back(cid);
+            }
+            std::sort(candidates.begin(), candidates.end(), [](ComponentID a, ComponentID b) {
+                return ComponentRegistry::Get(a).name < ComponentRegistry::Get(b).name;
+            });
+
+            if (candidates.empty())
+                ImGui::TextDisabled("(nothing to add)");
+            for (ComponentID cid : candidates) {
+                if (ImGui::MenuItem(ComponentRegistry::Get(cid).name.c_str())) {
+                    hasPendingAdd = true;
+                    pendingAdd = cid;
+                }
+            }
+            ImGui::EndPopup();
+        }
     }
     ImGui::End();
+
+    if (hasPendingRemove)
+        registry.RemoveRaw(e, pendingRemove);
+    if (hasPendingAdd)
+        registry.AddRaw(e, pendingAdd, nullptr);
 }
 
 void InspectorPanel::DrawField(const FieldInfo& field, std::byte* base) {
+    if (field.type == FieldType::Char) {
+        char* text = reinterpret_cast<char*>(base + field.offset);
+        text[field.count - 1] = '\0';
+        ImGui::InputText(field.name, text, field.count);
+        return;
+    }
+
     for (uint32_t elem = 0; elem < field.count; ++elem) {
         ImGui::PushID(static_cast<int>(elem));
 
@@ -121,6 +180,8 @@ void InspectorPanel::DrawField(const FieldInfo& field, std::byte* base) {
                                 EntityTraits::Index(target), EntityTraits::Generation(target));
                 break;
             }
+            case FieldType::Char:
+                break; // unreachable?
         }
         ImGui::PopID();
     }
