@@ -55,8 +55,7 @@ namespace ComponentRegistry {
             std::memcpy(defaults.data(), defaultData, size);
 
         const ComponentID id = static_cast<ComponentID>(state.infos.size());
-        state.infos.push_back(ComponentInfo{key, size, alignment, std::string(name),
-            std::vector<FieldInfo>(fields.begin(), fields.end()), std::move(defaults)});
+        state.infos.push_back(ComponentInfo{key, size, alignment, std::string(name), std::vector<FieldInfo>(fields.begin(), fields.end()), std::move(defaults)});
         state.byKey.emplace(key, id);
         return id;
     }

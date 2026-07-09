@@ -119,6 +119,11 @@ add_library(LutumCore STATIC
         src/Lutum/ECS/Resource.cpp
         src/Lutum/ECS/Snapshot.cpp
         src/Lutum/ECS/Reflect.hpp
+        src/Lutum/Core/Hash.hpp
+        src/Lutum/Assets/AssetID.hpp
+        src/Lutum/Assets/AssetHeader.hpp
+        src/Lutum/Assets/AssetRegistry.hpp
+        src/Lutum/Assets/AssetRegistry.cpp
 )
 target_include_directories(LutumCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(LutumCore PUBLIC

@@ -21,20 +21,13 @@
 #include <vector>
 
 #include "Lutum/ECS/Reflect.hpp"
+#include "Lutum/Core/Hash.hpp"
 
 namespace Lutum::Curia {
 
 using ComponentID = uint32_t; // dense runtime ID
-using StableKey = uint64_t; // name hash
-
-constexpr StableKey HashName(const char* name) {
-    StableKey hash = 14695981039346656037ULL;
-    for (const char* c = name; *c != '\0'; ++c) {
-        hash ^= static_cast<uint8_t>(*c);
-        hash *= 1099511628211ULL;
-    }
-    return hash;
-}
+using Lutum::StableKey;
+using Lutum::HashName;
 
 struct ComponentInfo {
     StableKey key = 0;

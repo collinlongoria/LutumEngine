@@ -275,4 +275,56 @@ bool EnsureDirectory(std::string_view virtualPath) {
     return true;
 }
 
+std::optional<std::vector<DirEntry>> ListDirectory(std::string_view virtualPath) {
+    const std::string resolved = Resolve(virtualPath);
+    if (resolved.empty())
+        return std::nullopt;
+
+    std::error_code ec;
+    if (!fs::is_directory(resolved, ec) || ec) {
+        LUTUM_WARN("FileSystem: '{}' is not a directory", virtualPath);
+        return std::nullopt;
+    }
+
+    std::vector<DirEntry> entries;
+    fs::directory_iterator it(resolved, ec);
+    for (const fs::directory_iterator end; it != end && !ec; it.increment(ec)) {
+        DirEntry entry;
+        entry.name = it->path().filename().string();
+        entry.isDirectory = it->is_directory(ec);
+        entries.push_back(std::move(entry));
+    }
+    if (ec) {
+        LUTUM_WARN("FileSystem: error while listing '{}': {}", virtualPath, ec.message());
+        return std::nullopt;
+    }
+
+    std::sort(entries.begin(), entries.end(),
+        [](const DirEntry& a, const DirEntry& b) { return a.name < b.name; });
+    return entries;
+}
+
+std::optional<std::vector<uint8_t>> ReadBytesPrefix(std::string_view virtualPath, size_t maxBytes) {
+    const std::string resolved = Resolve(virtualPath);
+    if (resolved.empty())
+        return std::nullopt;
+
+    std::vector<uint8_t> data;
+    if (maxBytes == 0)
+        return std::nullopt;
+
+    std::FILE* file = std::fopen(resolved.c_str(), "rb");
+    if (!file) {
+        LUTUM_WARN("FileSystem: failed to open '{}'", virtualPath);
+        return std::nullopt;
+    }
+
+    data.resize(maxBytes);
+    const size_t read = std::fread(data.data(), 1, maxBytes, file);
+    std::fclose(file);
+
+    data.resize(read);
+    return data;
+}
+
 } // Lutum::Filesystem

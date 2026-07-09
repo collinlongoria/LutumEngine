@@ -3,6 +3,7 @@ add_executable(LutumTests
         Core/TestJobs.cpp
         ECS/TestCuria.cpp
         Core/TestFileSystem.cpp
+        Assets/TestAssets.cpp
 )
 
 target_link_libraries(LutumTests PRIVATE

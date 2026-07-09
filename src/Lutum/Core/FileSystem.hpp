@@ -64,8 +64,19 @@ namespace FileSystem {
 
     // Creates a directory (and parents) for a virtual path
     bool EnsureDirectory(std::string_view virtualPath);
+
+    struct DirEntry {
+        std::string name; // filename only (no path)
+        bool isDirectory = false;
+    };
+
+    [[nodiscard]]
+    std::optional<std::vector<DirEntry>> ListDirectory(std::string_view virtualPath);
+
+    [[nodiscard]]
+    std::optional<std::vector<uint8_t>> ReadBytesPrefix(std::string_view virtualPath, size_t maxBytes);
 } // Filesystem
 
 } // Lutum
 
-#endif //LUTUMENGINE_FILESYSTEM_HPP
+#endif //LUTUM_FILESYSTEM_HPP

@@ -19,6 +19,7 @@
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_process.h>
 
+#include "Lutum/Assets/AssetRegistry.hpp"
 #include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Core/Jobs.hpp"
 #include "Lutum/Core/Log.hpp"
@@ -50,6 +51,9 @@ bool Application::Initialize(const char* projectPath, const char* executablePath
         return false;
     if (!FileSystem::MountProject(projectPath))
         return false;
+
+    // Asset Systems
+    Assets::Initialize();
 
     m_projectPath = std::filesystem::absolute(projectPath).string();
     auto recent = LoadRecentProjects();
@@ -233,6 +237,7 @@ void Application::Shutdown() {
     m_platform.reset();
 
     Jobs::Shutdown();
+    Assets::Shutdown();
     FileSystem::Shutdown();
     Log::Shutdown();
 }
