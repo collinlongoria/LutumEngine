@@ -287,6 +287,7 @@ if(LUTUM_BUILD_EDITOR)
             src/Editor/FileDialogs.cpp
             src/Editor/AssetImport.hpp
             src/Editor/AssetImport.cpp
+            src/Editor/AssetTypeHints.hpp
     )
     target_link_libraries(LutumEditor
             PRIVATE

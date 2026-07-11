@@ -13,6 +13,7 @@
 #ifndef LUTUM_INSPECTORPANEL_HPP
 #define LUTUM_INSPECTORPANEL_HPP
 #include <cstddef>
+#include <string>
 
 namespace Lutum {
 struct EditorContext;
@@ -23,7 +24,7 @@ public:
     void Draw(Curia::Registry& registry, EditorContext& context);
 
 private:
-    static void DrawField(const Curia::FieldInfo& field, std::byte* base);
+    static void DrawField(const std::string& componentName, const Curia::FieldInfo& field, std::byte* base);
 };
 } // Lutum
 
