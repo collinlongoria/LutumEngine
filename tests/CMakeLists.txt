@@ -4,6 +4,7 @@ add_executable(LutumTests
         ECS/TestCuria.cpp
         Core/TestFileSystem.cpp
         Assets/TestAssets.cpp
+        Assets/TestAssetPayloads.cpp
 )
 
 target_link_libraries(LutumTests PRIVATE

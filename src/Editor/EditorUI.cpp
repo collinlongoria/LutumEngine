@@ -17,6 +17,8 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include "Editor/EngineContentGen.hpp"
+#include "Lutum/Assets/AssetRegistry.hpp"
 #include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Core/Log.hpp"
 #include "Lutum/ECS/Registry.hpp"
@@ -103,6 +105,14 @@ void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
         ImGui::Separator();
         if (ImGui::MenuItem("Exit"))
             m_context.exitRequested = true;
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Tools")) {
+        if (ImGui::MenuItem("Generate Engine Content (dev)")) {
+            if (GenerateEngineContent())
+                Assets::Rescan();
+        }
         ImGui::EndMenu();
     }
 

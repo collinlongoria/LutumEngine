@@ -124,6 +124,13 @@ add_library(LutumCore STATIC
         src/Lutum/Assets/AssetHeader.hpp
         src/Lutum/Assets/AssetRegistry.hpp
         src/Lutum/Assets/AssetRegistry.cpp
+        src/Lutum/Assets/PayloadIO.hpp
+        src/Lutum/Assets/TextureAsset.hpp
+        src/Lutum/Assets/TextureAsset.cpp
+        src/Lutum/Assets/MeshAsset.hpp
+        src/Lutum/Assets/MeshAsset.cpp
+        src/Lutum/Assets/MaterialAsset.hpp
+        src/Lutum/Assets/MaterialAsset.cpp
 )
 target_include_directories(LutumCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(LutumCore PUBLIC
@@ -254,8 +261,10 @@ if(LUTUM_BUILD_EDITOR)
             src/Editor/EditorSettings.cpp
             src/Editor/Panels/LogPanel.hpp
             src/Editor/Panels/LogPanel.cpp
+            src/Editor/EngineContentGen.hpp
+            src/Editor/EngineContentGen.cpp
     )
-    target_link_libraries(LutumEditor PRIVATE LutumEngine)
+    target_link_libraries(LutumEditor PRIVATE LutumEngine stb)
 endif()
 
 # =========================
