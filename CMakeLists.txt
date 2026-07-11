@@ -236,6 +236,23 @@ endif()
 # =========================
 
 if(LUTUM_BUILD_EDITOR)
+    # Assimp
+    set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_FBX_IMPORTER ON CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_GLTF_IMPORTER ON CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
+
+    set(LUTUM_SAVED_BUILD_SHARED ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+    add_subdirectory(external/assimp)
+    set(BUILD_SHARED_LIBS ${LUTUM_SAVED_BUILD_SHARED})
+
     add_executable(LutumEditor
             src/Editor/main.cpp
             src/Editor/Application.cpp
@@ -263,8 +280,17 @@ if(LUTUM_BUILD_EDITOR)
             src/Editor/Panels/LogPanel.cpp
             src/Editor/EngineContentGen.hpp
             src/Editor/EngineContentGen.cpp
+            src/Editor/FileDialogs.hpp
+            src/Editor/FileDialogs.cpp
+            src/Editor/AssetImport.hpp
+            src/Editor/AssetImport.cpp
     )
-    target_link_libraries(LutumEditor PRIVATE LutumEngine stb)
+    target_link_libraries(LutumEditor
+            PRIVATE
+            LutumEngine
+            stb
+            assimp::assimp
+    )
 endif()
 
 # =========================

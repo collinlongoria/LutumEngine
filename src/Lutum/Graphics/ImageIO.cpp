@@ -44,4 +44,21 @@ std::optional<ImageData> Load(std::string_view virtualPath) {
     stbi_image_free(pixels);
     return image;
 }
+
+std::optional<ImageData> LoadFromMemory(std::span<const uint8_t> bytes) {
+    int width = 0, height = 0, channels = 0;
+    stbi_uc* pixels = stbi_load_from_memory(bytes.data(), static_cast<int>(bytes.size()), &width, &height, &channels, 4);
+    if (!pixels) {
+        LUTUM_ERROR("ImageIO: decode failed: {}", stbi_failure_reason());
+        return std::nullopt;
+    }
+
+    ImageData image;
+    image.width = static_cast<uint32_t>(width);
+    image.height = static_cast<uint32_t>(height);
+    image.pixels.assign(pixels, pixels + static_cast<size_t>(width) * height * 4);
+
+    stbi_image_free(pixels);
+    return image;
+}
 } // Lutum::ImageIO

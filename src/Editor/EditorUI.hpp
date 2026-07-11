@@ -74,6 +74,8 @@ private:
 
     float m_lastWorkWidth = 0.0f;
     float m_lastWorkHeight = 0.0f;
+
+    void ProcessDialogResults();
 };
 } // Lutum
 

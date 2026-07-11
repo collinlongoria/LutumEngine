@@ -17,6 +17,8 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include "AssetImport.hpp"
+#include "FileDialogs.hpp"
 #include "Editor/EngineContentGen.hpp"
 #include "Lutum/Assets/AssetRegistry.hpp"
 #include "Lutum/Core/FileSystem.hpp"
@@ -41,6 +43,8 @@ namespace Lutum {
 static constexpr const char* kSnapshotPath = "/Game/scene.lsnap";
 
 void EditorUI::Draw(Curia::Registry& registry, Curia::Scheduler& scheduler, RenderTarget& sceneTarget) {
+    ProcessDialogResults();
+
     DrawMainMenuBar(registry);
 
     const ImGuiID dockspaceId = ImHashStr("LutumDockSpace");
@@ -113,6 +117,16 @@ void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
             if (GenerateEngineContent())
                 Assets::Rescan();
         }
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Assets")) {
+        if (ImGui::MenuItem("Import Mesh..."))
+            FileDialogs::ShowOpenFile(FileDialogs::Purpose::IMPORT_MESH,
+                                      "Mesh files", "fbx;obj;gltf;glb", true);
+        if (ImGui::MenuItem("Import Texture..."))
+            FileDialogs::ShowOpenFile(FileDialogs::Purpose::IMPORT_TEXTURE,
+                                      "Image files", "png;jpg;jpeg", true);
         ImGui::EndMenu();
     }
 
@@ -196,5 +210,34 @@ void EditorUI::BuildDefaultLayout(unsigned int dockspaceId) {
     ImGui::DockBuilderDockWindow("Stats", bottomRight);
 
     ImGui::DockBuilderFinish(dockspaceId);
+}
+
+void EditorUI::ProcessDialogResults() {
+    for (const FileDialogs::Result& result : FileDialogs::Drain()) {
+        if (result.paths.empty())
+            continue; // cancelled
+
+        switch (result.purpose) {
+            case FileDialogs::Purpose::IMPORT_MESH: {
+                bool imported = false;
+                for (const std::string& path : result.paths)
+                    imported |= AssetImport::ImportMeshFile(path);
+                if (imported)
+                    Assets::Rescan();
+                break;
+            }
+            case FileDialogs::Purpose::IMPORT_TEXTURE: {
+                bool imported = false;
+                for (const std::string& path : result.paths)
+                    imported |= AssetImport::ImportTextureFile(path);
+                if (imported)
+                    Assets::Rescan();
+                break;
+            }
+            default:
+                LUTUM_WARN("FileDialogs: unhandled dialog purpose {}", static_cast<int>(result.purpose));
+                break;
+        }
+    }
 }
 } // Lutum

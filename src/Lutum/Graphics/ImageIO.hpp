@@ -14,6 +14,7 @@
 #define LUTUM_IMAGEIO_HPP
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -30,6 +31,11 @@ namespace ImageIO {
     // Forces RGBA8.
     [[nodiscard]]
     std::optional<ImageData> Load(std::string_view virtualPath);
+
+    // Decodes an in-memory image (Texture asset payloads)
+    // Forces RGBA8
+    [[nodiscard]]
+    std::optional<ImageData> LoadFromMemory(std::span<const uint8_t> bytes);
 } // ImageIO
 } // Lutum
 
