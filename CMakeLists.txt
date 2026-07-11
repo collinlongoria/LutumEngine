@@ -181,6 +181,8 @@ if(LUTUM_ENABLE_RENDERER)
             src/Lutum/Graphics/ImageIO.hpp
             src/Lutum/Graphics/Texture.cpp
             src/Lutum/Graphics/Texture.hpp
+            src/Lutum/Graphics/RenderPools.hpp
+            src/Lutum/Graphics/RenderPools.cpp
     )
 
     if(LUTUM_ENABLE_DEBUG_UI)
@@ -211,6 +213,7 @@ add_library(LutumScene STATIC
         src/Lutum/Scene/CameraSystems.cpp
         src/Lutum/Scene/CameraSystems.hpp
         src/Lutum/Scene/Name.hpp
+        src/Lutum/Scene/MeshRenderer.hpp
 )
 target_link_libraries(LutumScene PUBLIC
         LutumCore

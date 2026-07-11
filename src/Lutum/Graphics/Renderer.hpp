@@ -21,6 +21,8 @@
 #include "Lutum/Scene/Camera.hpp"
 #include "Lutum/Scene/Transform.hpp"
 #include "Lutum/Graphics/RenderTarget.hpp"
+#include "Lutum/Graphics/RenderPools.hpp"
+#include "Lutum/Scene/MeshRenderer.hpp"
 
 struct SDL_GPUSampler;
 
@@ -51,6 +53,8 @@ public:
     void Shutdown();
 
 private:
+    const Texture* ResolveAlbedo(AssetID materialId);
+
     GraphicsDevice* m_device = nullptr;
 
     bool m_initialized = false;
@@ -61,13 +65,16 @@ private:
     SDL_GPUTexture* m_swapchainTexture = nullptr;
     bool m_swapchainDrawn = false; // decides LOAD vs CLEAR for the UI pass
 
-    GraphicsPipeline m_placeholderPipeline;
-    Buffer m_placeholderVBO;
-    RenderTarget m_sceneTarget;
-    Texture m_placeholderTexture;
-    Buffer m_placeholderIBO;
+    GraphicsPipeline m_meshPipeline;
     SDL_GPUSampler* m_sampler = nullptr;
 
+    MeshPool m_meshPool;
+    TexturePool m_texturePool;
+    MaterialPool m_materialPool;
+    AssetID m_defaultMaterial{};
+    AssetID m_defaultTexture{};
+
+    Curia::Query<Transform, MeshRenderer> m_meshQuery;
     Curia::Query<Transform, CameraComponent, Curia::With<ActiveCamera>> m_cameraQuery;
 };
 } // Lutum

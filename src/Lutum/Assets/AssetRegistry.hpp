@@ -40,11 +40,13 @@ const AssetInfo* Find(AssetID id);
 [[nodiscard]]
 std::vector<const AssetInfo*> FindByType(StableKey typeKey);
 
+[[nodiscard]]
+const AssetInfo* FindByPath(std::string_view virtualPath);
+
 void ForEach(const std::function<void(const AssetInfo&)>& fn);
 
 [[nodiscard]]
 size_t Count();
 
-}
-
+} // Lutum::Assets
 #endif //LUTUM_ASSETREGISTRY_HPP

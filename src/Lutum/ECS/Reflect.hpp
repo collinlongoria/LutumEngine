@@ -23,6 +23,7 @@ enum class FieldType : uint8_t {
     Vec2, Vec3, Vec4, Quat,
     EntityRef,
     Char,
+    AssetRef,
 };
 
 [[nodiscard]]
@@ -39,7 +40,8 @@ constexpr size_t FieldTypeSize(FieldType type) {
         case FieldType::Vec3:      return 12;
         case FieldType::Vec4:
         case FieldType::Quat:      return 16;
-        case FieldType::EntityRef: return 8;
+        case FieldType::EntityRef:
+        case FieldType::AssetRef:  return 8;
     }
     return 0;
 }

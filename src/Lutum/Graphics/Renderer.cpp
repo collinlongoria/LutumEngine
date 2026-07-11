@@ -15,6 +15,8 @@
 #include <SDL3/SDL_gpu.h>
 
 #include "ImageIO.hpp"
+#include "Lutum/Assets/AssetRegistry.hpp"
+#include "Lutum/Assets/MeshAsset.hpp"
 #include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Debug/DebugUI.hpp"
 #include "Lutum/Graphics/GpuUploader.hpp"
@@ -26,13 +28,9 @@
 
 namespace Lutum {
 
-struct FrameUniforms {
+struct ObjectUniforms {
     Mat4 viewProj;
-};
-
-struct Vertex {
-    float position[3];
-    float color[3];
+    Mat4 model;
 };
 
 Renderer::Renderer(GraphicsDevice &device)
@@ -61,11 +59,12 @@ bool Renderer::Initialize(const RenderTarget& sceneTarget) {
     pipelineInfo.vertexShader = &*vert;
     pipelineInfo.fragmentShader = &*frag;
     pipelineInfo.primitiveType = PrimitiveType::TRIANGLE_LIST;
-    pipelineInfo.vertexLayout.stride = sizeof(Vertex);
+    pipelineInfo.vertexLayout.stride = sizeof(MeshVertex);
     pipelineInfo.vertexLayout.attributes = {
-            { 0, VertexFormat::FLOAT3, offsetof(Vertex, position) },
-            { 1, VertexFormat::FLOAT3, offsetof(Vertex, color) },
-        };
+        { 0, VertexFormat::FLOAT3, offsetof(MeshVertex, position) },
+        { 1, VertexFormat::FLOAT3, offsetof(MeshVertex, normal) },
+        { 2, VertexFormat::FLOAT2, offsetof(MeshVertex, uv) },
+    };
     pipelineInfo.depthState.testEnabled = true;
     pipelineInfo.depthState.writeEnabled = true;
     pipelineInfo.depthState.compareOp = CompareOp::LESS;
@@ -76,48 +75,7 @@ bool Renderer::Initialize(const RenderTarget& sceneTarget) {
     std::optional<GraphicsPipeline> pipeline = GraphicsPipeline::Create(*m_device, pipelineInfo);
     if (!pipeline)
         return false;
-
-    m_placeholderPipeline = std::move(*pipeline);
-
-    // Vertex & Index buffer
-    const Vertex vertices[] = {
-        // +Z front
-        {{-0.5f,-0.5f, 0.5f},{0,1}}, {{ 0.5f,-0.5f, 0.5f},{1,1}}, {{ 0.5f, 0.5f, 0.5f},{1,0}}, {{-0.5f, 0.5f, 0.5f},{0,0}},
-        // -Z back
-        {{ 0.5f,-0.5f,-0.5f},{0,1}}, {{-0.5f,-0.5f,-0.5f},{1,1}}, {{-0.5f, 0.5f,-0.5f},{1,0}}, {{ 0.5f, 0.5f,-0.5f},{0,0}},
-        // +X right
-        {{ 0.5f,-0.5f, 0.5f},{0,1}}, {{ 0.5f,-0.5f,-0.5f},{1,1}}, {{ 0.5f, 0.5f,-0.5f},{1,0}}, {{ 0.5f, 0.5f, 0.5f},{0,0}},
-        // -X left
-        {{-0.5f,-0.5f,-0.5f},{0,1}}, {{-0.5f,-0.5f, 0.5f},{1,1}}, {{-0.5f, 0.5f, 0.5f},{1,0}}, {{-0.5f, 0.5f,-0.5f},{0,0}},
-        // +Y top
-        {{-0.5f, 0.5f, 0.5f},{0,1}}, {{ 0.5f, 0.5f, 0.5f},{1,1}}, {{ 0.5f, 0.5f,-0.5f},{1,0}}, {{-0.5f, 0.5f,-0.5f},{0,0}},
-        // -Y bottom
-        {{-0.5f,-0.5f,-0.5f},{0,1}}, {{ 0.5f,-0.5f,-0.5f},{1,1}}, {{ 0.5f,-0.5f, 0.5f},{1,0}}, {{-0.5f,-0.5f, 0.5f},{0,0}},
-    };
-
-    uint16_t indices[36];
-    for (uint16_t face = 0; face < 6; ++face) {
-        const uint16_t base = face * 4;
-        const uint16_t faceIndices[6] = {
-            base, uint16_t(base + 1), uint16_t(base + 2),
-            base, uint16_t(base + 2), uint16_t(base + 3)
-        };
-        std::memcpy(indices + face * 6, faceIndices, sizeof(faceIndices));
-    }
-
-    auto image = ImageIO::Load("/Game/textures/test.png");
-    if (!image) {
-        LUTUM_ERROR("Renderer: failed to load test texture");
-        return false;
-    }
-
-    Texture::CreateInfo texInfo = {};
-    texInfo.width = image->width;
-    texInfo.height = image->height;
-    std::optional<Texture> texture = Texture::Create(*m_device, texInfo, "test_texture");
-    if (!texture)
-        return false;
-    m_placeholderTexture = std::move(*texture);
+    m_meshPipeline = std::move(*pipeline);
 
     SDL_GPUSamplerCreateInfo samplerInfo = {};
     samplerInfo.min_filter = SDL_GPU_FILTER_LINEAR;
@@ -130,22 +88,15 @@ bool Renderer::Initialize(const RenderTarget& sceneTarget) {
     if (!m_sampler)
         return false;
 
-    // buffers
-    std::optional<Buffer> vbo = Buffer::Create(*m_device, BufferUsage::VERTEX, sizeof(vertices), "placeholder_vbo");
-    if (!vbo) return false;
-    m_placeholderVBO = std::move(*vbo);
+    m_meshPool.Initialize(*m_device);
+    m_texturePool.Initialize(*m_device);
 
-    std::optional<Buffer> ibo = Buffer::Create(*m_device, BufferUsage::INDEX, sizeof(indices), "placeholder_ibo");
-    if (!ibo) return false;
-    m_placeholderIBO = std::move(*ibo);
-
-    GpuUploader uploader(*m_device);
-    if (!uploader.Begin()) return false;
-    if (!uploader.Upload(m_placeholderVBO, vertices, sizeof(vertices))) return false;
-    if (!uploader.Upload(m_placeholderIBO, indices, sizeof(indices))) return false;
-    if (!uploader.Upload(m_placeholderTexture, image->pixels.data(),
-                         static_cast<uint32_t>(image->pixels.size()))) return false;
-    if (!uploader.End()) return false;
+    if (const auto* mat = Assets::FindByPath("/Engine/Materials/DefaultMaterial.lasset"))
+        m_defaultMaterial = mat->id;
+    if (const auto* tex = Assets::FindByPath("/Engine/Textures/DefaultTexture.lasset"))
+        m_defaultTexture = tex->id;
+    if (m_defaultMaterial.IsNull() || m_defaultTexture.IsNull())
+        LUTUM_WARN("Renderer: engine content missing! run Tools > Generate Engine Content");
 
     m_initialized = true;
     return true;
@@ -183,6 +134,8 @@ void Renderer::RenderScene(Curia::Registry& registry, RenderTarget& target) {
     if (!m_cmd || !m_initialized)
         return;
 
+    m_meshQuery.Refresh(registry);
+
     m_cameraQuery.Refresh(registry);
     bool hasCamera = false;
     Mat4 viewProj(1.0f);
@@ -193,30 +146,38 @@ void Renderer::RenderScene(Curia::Registry& registry, RenderTarget& target) {
         }
     });
 
-    if (hasCamera) {
-        FrameUniforms uniforms = {};
-        uniforms.viewProj = viewProj;
-        SDL_PushGPUVertexUniformData(m_cmd, 0, &uniforms, sizeof(uniforms));
-    }
-
     SDL_GPUTexture* swapchain = target.IsOffscreen() ? nullptr : m_swapchainTexture;
     SDL_GPURenderPass* pass = target.BeginRenderPass(m_cmd, swapchain, Vec4(0.08f, 0.08f, 0.10f, 1.0f));
     if (!pass)
         return;
 
     if (hasCamera) {
-        SDL_BindGPUGraphicsPipeline(pass, m_placeholderPipeline.NativeHandle());
+        SDL_BindGPUGraphicsPipeline(pass, m_meshPipeline.NativeHandle());
 
-        SDL_GPUBufferBinding vertexBinding = {m_placeholderVBO.NativeHandle(), 0};
-        SDL_BindGPUVertexBuffers(pass, 0, &vertexBinding, 1);
+        m_meshQuery.Each([&](Transform& transform, MeshRenderer& meshRenderer) {
+            const GpuMesh* mesh = m_meshPool.Get(meshRenderer.mesh);
+            if (!mesh)
+                return; // null/missing mesh draws nothing
+            const Texture* albedo = ResolveAlbedo(meshRenderer.material);
+            if (!albedo)
+                return;
 
-        SDL_GPUBufferBinding indexBinding = {m_placeholderIBO.NativeHandle(), 0};
-        SDL_BindGPUIndexBuffer(pass, &indexBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+            ObjectUniforms uniforms;
+            uniforms.viewProj = viewProj;
+            uniforms.model = glm::translate(Mat4(1.0f), transform.position)
+                           * glm::mat4_cast(transform.rotation)
+                           * glm::scale(Mat4(1.0f), transform.scale);
+            SDL_PushGPUVertexUniformData(m_cmd, 0, &uniforms, sizeof(uniforms));
 
-        SDL_GPUTextureSamplerBinding textureBinding = {m_placeholderTexture.NativeHandle(), m_sampler};
-        SDL_BindGPUFragmentSamplers(pass, 0, &textureBinding, 1);
+            SDL_GPUBufferBinding vertexBinding = {mesh->vbo.NativeHandle(), 0};
+            SDL_BindGPUVertexBuffers(pass, 0, &vertexBinding, 1);
+            SDL_GPUBufferBinding indexBinding = {mesh->ibo.NativeHandle(), 0};
+            SDL_BindGPUIndexBuffer(pass, &indexBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT); // u32 now
+            SDL_GPUTextureSamplerBinding textureBinding = {albedo->NativeHandle(), m_sampler};
+            SDL_BindGPUFragmentSamplers(pass, 0, &textureBinding, 1);
 
-        SDL_DrawGPUIndexedPrimitives(pass, 36, 1, 0, 0, 0);
+            SDL_DrawGPUIndexedPrimitives(pass, mesh->indexCount, 1, 0, 0, 0);
+        });
     }
 
     SDL_EndGPURenderPass(pass);
@@ -260,14 +221,30 @@ void Renderer::Shutdown() {
     // Make sure the GPU isn't still using the pipeline before releasing it.
     SDL_WaitForGPUIdle(m_device->NativeHandle());
 
+    m_meshPool.Clear();
+    m_texturePool.Clear();
+    m_materialPool.Clear();
+
     SDL_ReleaseGPUSampler(m_device->NativeHandle(), m_sampler);
-    m_placeholderTexture = Texture{};
-    m_placeholderIBO = Buffer{};
-    m_placeholderVBO = Buffer{};
-    m_placeholderPipeline = GraphicsPipeline{};
+    m_meshPipeline = GraphicsPipeline{};
     m_shaderCompiler.reset();
 
     m_initialized = false;
+}
+
+const Texture* Renderer::ResolveAlbedo(AssetID materialId) {
+    if (materialId.IsNull())
+        materialId = m_defaultMaterial;
+    const MaterialData* material = m_materialPool.Get(materialId);
+    if (!material && materialId != m_defaultMaterial)
+        material = m_materialPool.Get(m_defaultMaterial); // broken ref -> default
+
+    const AssetID albedoId = (material && !material->albedo.IsNull())
+        ? material->albedo : m_defaultTexture;
+    const Texture* texture = m_texturePool.Get(albedoId);
+    if (!texture && albedoId != m_defaultTexture)
+        texture = m_texturePool.Get(m_defaultTexture);
+    return texture;
 }
 
 Renderer::~Renderer() {

@@ -32,8 +32,10 @@
 #include "Lutum/Platform/Window.hpp"
 #include "Lutum/Scene/Camera.hpp"
 #include "Lutum/Scene/CameraSystems.hpp"
+#include "Lutum/Scene/MeshRenderer.hpp"
 #include "Lutum/Scene/Name.hpp"
 #include "Lutum/Scene/Transform.hpp"
+#include "Lutum/ECS/Component.hpp"
 
 namespace Lutum {
 Application::Application() = default;

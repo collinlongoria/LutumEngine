@@ -130,6 +130,14 @@ std::vector<const AssetInfo*> FindByType(StableKey typeKey) {
     return result;
 }
 
+const AssetInfo *FindByPath(std::string_view virtualPath) {
+    for (const auto& [id, info] : State().assets) {
+        if (info.virtualPath == virtualPath)
+            return &info;
+    }
+    return nullptr;
+}
+
 void ForEach(const std::function<void(const AssetInfo&)>& fn) {
     for (const auto& [id, info] : State().assets)
         fn(info);

@@ -87,8 +87,7 @@ struct ComponentType {
                     std::span<const FieldInfo>(kFields.data(), kFields.size()), defaultData);
             }
             else {
-                return ComponentRegistry::Register(
-                    HashName(T::kCuriaName), T::kCuriaName, size, alignment, {}, defaultData);
+                return ComponentRegistry::Register(HashName(T::kCuriaName), T::kCuriaName, size, alignment, {}, defaultData);
             }
         }();
         return id;

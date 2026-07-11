@@ -19,6 +19,7 @@
 #include <imgui.h>
 
 #include "Editor/EditorContext.hpp"
+#include "Lutum/Assets/AssetID.hpp"
 #include "Lutum/Core/Math.hpp"
 #include "Lutum/ECS/Registry.hpp"
 #include "Lutum/ECS/Reflect.hpp"
@@ -178,6 +179,11 @@ void InspectorPanel::DrawField(const FieldInfo& field, std::byte* base) {
                 else
                     ImGui::Text("%s: %u:%u", label.c_str(),
                                 EntityTraits::Index(target), EntityTraits::Generation(target));
+                break;
+            }
+            case FieldType::AssetRef: {
+                const auto* id = reinterpret_cast<const AssetID*>(ptr);
+                ImGui::Text("%016llx", static_cast<unsigned long long>(id->value));
                 break;
             }
             case FieldType::Char:

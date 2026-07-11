@@ -22,26 +22,13 @@
 namespace Lutum::ImageIO {
 
 std::optional<ImageData> Load(std::string_view virtualPath) {
-    auto bytes = FileSystem::ReadBytes(virtualPath);
+    const auto bytes = FileSystem::ReadBytes(virtualPath);
     if (!bytes)
         return std::nullopt;
 
-    int width = 0, height = 0, channels = 0;
-    stbi_uc* pixels = stbi_load_from_memory(
-        bytes->data(), static_cast<int>(bytes->size()),
-        &width, &height, &channels, STBI_rgb_alpha);
-
-    if (!pixels) {
-        LUTUM_ERROR("ImageIO: failed to decode '{}': {}", virtualPath, stbi_failure_reason());
-        return std::nullopt;
-    }
-
-    ImageData image;
-    image.width = static_cast<uint32_t>(width);
-    image.height = static_cast<uint32_t>(height);
-    image.pixels.assign(pixels, pixels + static_cast<size_t>(width) * height * 4);
-
-    stbi_image_free(pixels);
+    auto image = LoadFromMemory(*bytes);
+    if (!image)
+        LUTUM_ERROR("ImageIO: failed to decode '{}'", virtualPath);
     return image;
 }
 

@@ -24,6 +24,8 @@
 #include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Core/Log.hpp"
 #include "Lutum/ECS/Registry.hpp"
+#include "Lutum/Scene/MeshRenderer.hpp"
+#include "Lutum/Scene/Transform.hpp"
 
 namespace {
 // Proportionally rescale every node's SizeRef
@@ -116,6 +118,16 @@ void EditorUI::DrawMainMenuBar(Curia::Registry& registry) {
         if (ImGui::MenuItem("Generate Engine Content (dev)")) {
             if (GenerateEngineContent())
                 Assets::Rescan();
+        }
+        if (ImGui::MenuItem("Spawn Cube (dev)")) {
+            const auto* cube = Assets::FindByPath("/Engine/Primitives/Cube.lasset");
+            const auto* mat = Assets::FindByPath("/Engine/Materials/DefaultMaterial.lasset");
+            if (cube) {
+                const Curia::Entity e = registry.Create();
+                registry.Add(e, Transform{});
+                registry.Add(e, MeshRenderer{cube->id, mat ? mat->id : AssetID{}});
+                registry.Add(e, MakeName("Cube"));
+            }
         }
         ImGui::EndMenu();
     }
