@@ -77,12 +77,34 @@ namespace {
 } // anonymous namespace
 
 std::vector<uint8_t> Registry::SaveSnapshot() const {
+    return SaveSnapshot(std::span<const StableKey>{});
+}
+
+std::vector<uint8_t> Registry::SaveSnapshot(std::span<const StableKey> excludeWithComponents) const {
+    // Resolve exclusion keys; unregistered keys can't be on any entity
+    std::vector<ComponentID> excluded;
+    excluded.reserve(excludeWithComponents.size());
+    for (const StableKey key : excludeWithComponents) {
+        if (const auto cid = ComponentRegistry::FindByKey(key))
+            excluded.push_back(*cid);
+    }
+    const auto isExcluded = [&](const Archetype* arch) {
+        for (const ComponentID cid : excluded) {
+            if (arch->HasComponent(cid))
+                return true;
+        }
+        return false;
+    };
+
     // gather populated archetypes, signatures re-sorted by stable key
     struct ArchEntry {
         const Archetype* arch = nullptr;
         std::vector<TypeRef> types; // key-sorted
         uint32_t rows = 0;
     };
+
+    // Excluded live entities, written as (index, generation+1) free entries
+    std::vector<std::pair<uint32_t, uint32_t>> pseudoFree;
 
     std::vector<ArchEntry> archEntries;
     for (const auto& archPtr : m_archetypes) {
@@ -93,6 +115,18 @@ std::vector<uint8_t> Registry::SaveSnapshot() const {
             rows += arch->GetSlab(s)->entityCount;
         if (rows == 0)
             continue; // zero-row archetypes carry no state
+
+        if (isExcluded(arch)) {
+            for (uint32_t s = 0; s < arch->SlabCount(); ++s) {
+                const Slab* slab = arch->GetSlab(s);
+                for (uint32_t row = 0; row < slab->entityCount; ++row) {
+                    const Entity e = arch->EntityAt(s, row);
+                    pseudoFree.emplace_back(EntityTraits::Index(e),
+                                            EntityTraits::Generation(e) + 1);
+                }
+            }
+            continue;
+        }
 
         ArchEntry entry;
         entry.arch = arch;
@@ -151,10 +185,14 @@ std::vector<uint8_t> Registry::SaveSnapshot() const {
 
     // Directory
     w.U32(static_cast<uint32_t>(m_directory.size()));
-    w.U32(static_cast<uint32_t>(m_freeIndices.size()));
+    w.U32(static_cast<uint32_t>(m_freeIndices.size() + pseudoFree.size()));
     for (uint32_t index : m_freeIndices) {
         w.U32(index);
         w.U32(m_directory[index].generation);
+    }
+    for (const auto& [index, generation] : pseudoFree) {
+        w.U32(index);
+        w.U32(generation);
     }
 
     // Archetypes

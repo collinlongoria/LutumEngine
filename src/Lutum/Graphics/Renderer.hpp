@@ -52,6 +52,7 @@ public:
 
     void Shutdown();
 
+    void InvalidateMaterials();
 private:
     const Texture* ResolveAlbedo(AssetID materialId);
 

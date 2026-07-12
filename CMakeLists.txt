@@ -131,6 +131,8 @@ add_library(LutumCore STATIC
         src/Lutum/Assets/MeshAsset.cpp
         src/Lutum/Assets/MaterialAsset.hpp
         src/Lutum/Assets/MaterialAsset.cpp
+        src/Lutum/Assets/LevelAsset.hpp
+        src/Lutum/Assets/LevelAsset.cpp
 )
 target_include_directories(LutumCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(LutumCore PUBLIC
@@ -288,6 +290,9 @@ if(LUTUM_BUILD_EDITOR)
             src/Editor/AssetImport.hpp
             src/Editor/AssetImport.cpp
             src/Editor/AssetTypeHints.hpp
+            src/Editor/EditorTags.hpp
+            src/Editor/AssetPicker.hpp
+            src/Editor/AssetPicker.cpp
     )
     target_link_libraries(LutumEditor
             PRIVATE

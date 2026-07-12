@@ -232,6 +232,10 @@ void Renderer::Shutdown() {
     m_initialized = false;
 }
 
+void Renderer::InvalidateMaterials() {
+    m_materialPool.Clear();
+}
+
 const Texture* Renderer::ResolveAlbedo(AssetID materialId) {
     if (materialId.IsNull())
         materialId = m_defaultMaterial;

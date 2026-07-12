@@ -19,6 +19,7 @@
 #include <imgui.h>
 
 #include "Editor/EditorContext.hpp"
+#include "Editor/EditorTags.hpp"
 #include "Lutum/ECS/Registry.hpp"
 
 namespace {
@@ -166,16 +167,26 @@ void EntitiesPanel::Draw(Registry& registry, EditorContext& context) {
     }
     ImGui::End();
 
+    const auto marksDirty = [&](Entity e) {
+        return registry.Alive(e) && !registry.Has<EditorOnly>(e);
+    };
+
     if (createRequested) {
         const Entity e = registry.Create();
         registry.Add<Name>(e, NextDefaultName(registry));
         context.selectedEntity = e;
+        context.levelDirty = true; // new entities are always level data
     }
 
-    if (duplicateTarget != INVALID_ENTITY)
+    if (duplicateTarget != INVALID_ENTITY) {
+        if (marksDirty(duplicateTarget))
+            context.levelDirty = true;
         context.selectedEntity = registry.Duplicate(duplicateTarget);
+    }
 
     if (commitRename && registry.Alive(m_renameTarget)) {
+        if (marksDirty(m_renameTarget))
+            context.levelDirty = true;
         if (registry.Has<Name>(m_renameTarget))
             registry.Set(m_renameTarget, MakeName(m_renameBuffer));
         else
@@ -184,6 +195,8 @@ void EntitiesPanel::Draw(Registry& registry, EditorContext& context) {
     }
 
     if (destroyTarget != INVALID_ENTITY) {
+        if (marksDirty(destroyTarget))
+            context.levelDirty = true; // checked BEFORE the destroy
         registry.Destroy(destroyTarget);
         if (context.selectedEntity == destroyTarget)
             context.selectedEntity = INVALID_ENTITY;

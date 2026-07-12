@@ -41,6 +41,12 @@ public:
     void Shutdown();
 
 private:
+    void CreateEditorCamera();
+
+    void NewLevel();
+    bool OpenLevel(const std::string& virtualPath);
+    bool SaveLevel(const std::string& virtualPath);
+
     std::unique_ptr<Lutum::PlatformContext> m_platform;
     std::unique_ptr<Lutum::Window> m_window;
     std::unique_ptr<Lutum::GraphicsDevice> m_graphicsDevice;

@@ -49,6 +49,9 @@ namespace FileSystem {
     // Empty string returned if the path is malformed or the relevant root is not mounted
     [[nodiscard]]
     std::string Resolve(std::string_view virtualPath);
+    // absolute path -> virtual path (inverse of resolve)
+    [[nodiscard]]
+    std::optional<std::string> ToVirtual(std::string_view absolutePath);
 
     [[nodiscard]]
     bool Exists(std::string_view virtualPath);
@@ -76,7 +79,5 @@ namespace FileSystem {
     [[nodiscard]]
     std::optional<std::vector<uint8_t>> ReadBytesPrefix(std::string_view virtualPath, size_t maxBytes);
 } // Filesystem
-
 } // Lutum
-
 #endif //LUTUM_FILESYSTEM_HPP

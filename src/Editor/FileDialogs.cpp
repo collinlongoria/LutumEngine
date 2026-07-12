@@ -36,6 +36,7 @@ namespace {
         Purpose purpose{};
         std::string filterName;
         std::string filterPattern;
+        std::string defaultLocation;
         SDL_DialogFileFilter filter{};
     };
 
@@ -58,30 +59,31 @@ namespace {
         delete ctx;
     }
 
-    DialogContext* MakeContext(Purpose purpose, const char* name, const char* pattern) {
+    DialogContext* MakeContext(Purpose purpose, const char* name, const char* pattern, const char* defaultLocation) {
         auto* ctx = new DialogContext;
         ctx->purpose = purpose;
         ctx->filterName = name ? name : "";
         ctx->filterPattern = pattern ? pattern : "";
+        ctx->defaultLocation = defaultLocation ? defaultLocation : "";
         ctx->filter = {ctx->filterName.c_str(), ctx->filterPattern.c_str()};
         return ctx;
     }
 
 } // anonymous namespace
 
-void ShowOpenFile(Purpose purpose, const char* filterName, const char* filterPattern, bool allowMany) {
-    DialogContext* ctx = MakeContext(purpose, filterName, filterPattern);
-    SDL_ShowOpenFileDialog(DialogCallback, ctx, nullptr, &ctx->filter, 1, nullptr, allowMany);
+void ShowOpenFile(Purpose purpose, const char* filterName, const char* filterPattern, bool allowMany, const char* defaultLocation) {
+    DialogContext* ctx = MakeContext(purpose, filterName, filterPattern, defaultLocation);
+    SDL_ShowOpenFileDialog(DialogCallback, ctx, nullptr, &ctx->filter, 1, ctx->defaultLocation.empty() ? nullptr : ctx->defaultLocation.c_str(), allowMany);
 }
 
-void ShowSaveFile(Purpose purpose, const char* filterName, const char* filterPattern) {
-    DialogContext* ctx = MakeContext(purpose, filterName, filterPattern);
-    SDL_ShowSaveFileDialog(DialogCallback, ctx, nullptr, &ctx->filter, 1, nullptr);
+void ShowSaveFile(Purpose purpose, const char* filterName, const char* filterPattern, const char* defaultLocation) {
+    DialogContext* ctx = MakeContext(purpose, filterName, filterPattern, defaultLocation);
+    SDL_ShowSaveFileDialog(DialogCallback, ctx, nullptr, &ctx->filter, 1, ctx->defaultLocation.empty() ? nullptr : ctx->defaultLocation.c_str());
 }
 
-void ShowOpenFolder(Purpose purpose) {
-    DialogContext* ctx = MakeContext(purpose, nullptr, nullptr);
-    SDL_ShowOpenFolderDialog(DialogCallback, ctx, nullptr, nullptr, false);
+void ShowOpenFolder(Purpose purpose, const char* defaultLocation) {
+    DialogContext* ctx = MakeContext(purpose, nullptr, nullptr, defaultLocation);
+    SDL_ShowOpenFolderDialog(DialogCallback, ctx, nullptr, ctx->defaultLocation.empty() ? nullptr : ctx->defaultLocation.c_str(), false);
 }
 
 std::vector<Result> Drain() {

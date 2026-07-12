@@ -19,7 +19,10 @@
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_process.h>
 
+#include "EditorTags.hpp"
+#include "Lutum/Assets/AssetHeader.hpp"
 #include "Lutum/Assets/AssetRegistry.hpp"
+#include "Lutum/Assets/LevelAsset.hpp"
 #include "Lutum/Core/FileSystem.hpp"
 #include "Lutum/Core/Jobs.hpp"
 #include "Lutum/Core/Log.hpp"
@@ -41,6 +44,20 @@ namespace Lutum {
 Application::Application() = default;
 Application::~Application() {
     Shutdown();
+}
+
+void Application::CreateEditorCamera() {
+    m_cameraEntity = m_registry.Create();
+    m_registry.Add(m_cameraEntity, MakeName("Editor Camera"));
+
+    m_registry.Add(m_cameraEntity, Transform{Vec3(0.0f, 0.0f, 2.0f)});
+    m_registry.Add(m_cameraEntity, CameraComponent{});
+    m_registry.Add(m_cameraEntity, FlyCam{});
+    m_registry.Add(m_cameraEntity, ActiveCamera{});
+    m_registry.Add(m_cameraEntity, EditorOnly{});
+
+    if (FlyCam* fly = m_registry.Get<FlyCam>(m_cameraEntity))
+        fly->moveSpeed = m_settings.cameraMoveSpeed;
 }
 
 bool Application::Initialize(const char* projectPath, const char* executablePath) {
@@ -135,16 +152,8 @@ bool Application::Initialize(const char* projectPath, const char* executablePath
     m_scheduler.Compile();
     m_scheduler.LogGraph();
 
-    // Camera entity
-    m_cameraEntity = m_registry.Create();
-    m_registry.Add(m_cameraEntity, Transform{Vec3(0.0f, 0.0f, 2.0f)});
-    m_registry.Add(m_cameraEntity, CameraComponent{});
-    FlyCam fly{};
-    fly.moveSpeed = m_settings.cameraMoveSpeed;
-    m_registry.Add(m_cameraEntity, fly);
-    m_registry.Add<ActiveCamera>(m_cameraEntity);
-    Name name = MakeName("Cammy the Camera");
-    m_registry.Add(m_cameraEntity, name);
+    // Editor Camera Entity
+    CreateEditorCamera();
 
     m_registry.GetResource<Input>().SetRelativeMouseMode(*m_window, false);
 
@@ -164,7 +173,8 @@ void Application::Run() {
         Input& input = m_registry.GetResource<Input>();
         input.Update();
 
-        // Editor fly controls
+        // TODO: move this
+        // --- Editor Fly Controls ---
         const ViewportInfo& viewport = m_registry.GetResource<ViewportInfo>();
         const bool rmbDown = input.IsMouseButtonDown(MouseButton::RIGHT);
         if (!input.IsRelativeMouseMode()) {
@@ -183,6 +193,7 @@ void Application::Run() {
         Debug::UI::BeginFrame();
         m_editorUI.Draw(m_registry, m_scheduler, m_sceneTarget); // writes ViewportInfo, resizes target
 
+        // --- Request Handling ---
         EditorContext& ctx = m_editorUI.Context();
         if (!ctx.relaunchProjectPath.empty()) {
             if (!m_executablePath.empty()) {
@@ -198,6 +209,22 @@ void Application::Run() {
         }
         if (ctx.exitRequested)
             m_window->RequestClose();
+        if (ctx.newLevelRequested) {
+            ctx.newLevelRequested = false;
+            NewLevel();
+        }
+        if (!ctx.openLevelPath.empty()) {
+            const std::string path = std::exchange(ctx.openLevelPath, {});
+            OpenLevel(path);
+        }
+        if (!ctx.saveLevelPath.empty()) {
+            const std::string path = std::exchange(ctx.saveLevelPath, {});
+            SaveLevel(path);
+        }
+        if (ctx.reloadMaterials) {
+            ctx.reloadMaterials = false;
+            m_renderer->InvalidateMaterials();
+        }
 
         m_scheduler.Run();
 
@@ -207,6 +234,75 @@ void Application::Run() {
             m_renderer->EndFrame();
         }
     }
+}
+
+void Application::NewLevel() {
+    EditorContext& ctx = m_editorUI.Context();
+    m_registry.Clear(); // invalidates ALL handles (#17)
+    ctx.selectedEntity = Curia::INVALID_ENTITY;
+    CreateEditorCamera();
+    ctx.currentLevelId = AssetID{};
+    ctx.currentLevelPath.clear();
+    ctx.levelDirty = false;
+    LUTUM_INFO("Level: new untitled level");
+}
+
+bool Application::OpenLevel(const std::string& virtualPath) {
+    const auto blob = LevelAsset::Load(virtualPath);
+    if (!blob)
+        return false;
+
+    EditorContext& ctx = m_editorUI.Context();
+    const std::vector<uint8_t> backup = m_registry.SaveSnapshot(); // unfiltered: restore keeps editor entities
+    m_registry.Clear();
+    ctx.selectedEntity = Curia::INVALID_ENTITY;
+
+    if (!m_registry.LoadSnapshot(*blob)) {
+        LUTUM_ERROR("Level: load failed for '{}' — restoring previous state", virtualPath);
+        [[maybe_unused]] const bool restored = m_registry.LoadSnapshot(backup);
+        return false;
+    }
+
+    CreateEditorCamera(); // level files never contain editor entities
+    const Assets::AssetInfo* info = Assets::FindByPath(virtualPath);
+    ctx.currentLevelId = info ? info->id : AssetID{};
+    ctx.currentLevelPath = virtualPath;
+    ctx.levelDirty = false;
+    LUTUM_INFO("Level: opened '{}'", virtualPath);
+    return true;
+}
+
+bool Application::SaveLevel(const std::string& virtualPath) {
+    EditorContext& ctx = m_editorUI.Context();
+
+    static constexpr StableKey kExcluded[] = {HashName("EditorOnly")};
+    const std::vector<uint8_t> snapshot = m_registry.SaveSnapshot(kExcluded);
+
+    // keep the current level's UUID when saving in place
+    // preserve an existing file's UUID when overwriting
+    // otherwise mint a new one
+    AssetID id{};
+    if (virtualPath == ctx.currentLevelPath && !ctx.currentLevelId.IsNull()) {
+        id = ctx.currentLevelId;
+    }
+    else if (FileSystem::Exists(virtualPath)) {
+        if (const auto head = FileSystem::ReadBytesPrefix(virtualPath, AssetHeader::kSize)) {
+            if (const auto header = AssetHeader::Decode(*head))
+                id = header->id;
+        }
+    }
+    if (id.IsNull())
+        id = GenerateAssetID();
+
+    if (!FileSystem::WriteBytes(virtualPath, LevelAsset::Encode(snapshot, id)))
+        return false;
+
+    Assets::Rescan();
+    ctx.currentLevelId = id;
+    ctx.currentLevelPath = virtualPath;
+    ctx.levelDirty = false;
+    LUTUM_INFO("Level: saved '{}'", virtualPath);
+    return true;
 }
 
 void Application::Shutdown() {

@@ -182,6 +182,43 @@ std::string Resolve(std::string_view virtualPath) {
     return (*root / fs::path(rest)).string();
 }
 
+std::optional<std::string> ToVirtual(std::string_view absolutePath) {
+    FileSystemState& state = State();
+
+    std::error_code ec;
+    const fs::path absolute = fs::weakly_canonical(fs::path(absolutePath), ec);
+    if (ec)
+        return std::nullopt;
+
+    struct RootMapping {
+        const fs::path* root;
+        const char* prefix;
+    };
+    const RootMapping mappings[] = {
+        {&state.contentRoot, "/Game/"},
+        {&state.savedRoot, "/Saved/"},
+        {&state.engineRoot, "/Engine/"},
+    };
+
+    for (const auto& [root, prefix] : mappings) {
+        if (root->empty())
+            continue;
+        const fs::path canonicalRoot = fs::weakly_canonical(*root, ec);
+        if (ec) { ec.clear(); continue; }
+
+        const fs::path relative = fs::relative(absolute, canonicalRoot, ec);
+        if (ec) { ec.clear(); continue; }
+
+        const std::string rel = relative.generic_string();
+        if (rel.empty() || rel.rfind("..", 0) == 0)
+            continue; // outside this root
+        if (rel == ".")
+            return std::string(prefix); // the root itself
+        return std::string(prefix) + rel;
+    }
+    return std::nullopt;
+}
+
 bool Exists(std::string_view virtualPath) {
     const std::string resolved = Resolve(virtualPath);
     return !resolved.empty() && fs::exists(resolved);

@@ -16,8 +16,11 @@
 
 namespace Lutum::AssetImport {
 
-bool ImportMeshFile(const std::string& absolutePath);
-bool ImportTextureFile(const std::string& absolutePath);
+bool ImportMeshFile(const std::string& absolutePath, const std::string& targetVirtualPath);
+bool ImportTextureFile(const std::string& absolutePath, const std::string& targetVirtualPath);
+
+[[nodiscard]]
+std::string DefaultTargetName(const std::string& absolutePath);
 
 } // Lutum::AssetImport
 #endif //LUTUM_ASSETIMPORT_HPP

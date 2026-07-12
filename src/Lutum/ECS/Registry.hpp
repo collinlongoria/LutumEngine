@@ -137,7 +137,10 @@ public:
     // --- Snapshot ---
 
     [[nodiscard]]
-    std::vector<uint8_t> SaveSnapshot() const;
+    std::vector<uint8_t> SaveSnapshot() const; // LREG snapshot of all entities
+    // filtered save: entities whose archetype contains ANY of the excluded components are written as free-list entries
+    [[nodiscard]]
+    std::vector<uint8_t> SaveSnapshot(std::span<const StableKey> excludeWithComponents) const;
     [[nodiscard]]
     bool LoadSnapshot(std::span<const uint8_t> bytes);
 

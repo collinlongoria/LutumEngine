@@ -30,11 +30,6 @@ namespace fs = std::filesystem;
 
 namespace Lutum::AssetImport {
 namespace {
-
-    std::string TargetPath(const std::string& absolutePath) {
-        return "/Game/" + fs::path(absolutePath).stem().string() + ".lasset";
-    }
-
     AssetID PreserveOrGenerateId(const std::string& virtualPath) {
         if (FileSystem::Exists(virtualPath)) {
             if (const auto bytes = FileSystem::ReadBytesPrefix(virtualPath, AssetHeader::kSize)) {
@@ -61,10 +56,13 @@ namespace {
 
 } // anonymous namespace
 
-bool ImportMeshFile(const std::string& absolutePath) {
+std::string DefaultTargetName(const std::string& absolutePath) {
+    return fs::path(absolutePath).stem().string() + ".lasset";
+}
+
+bool ImportMeshFile(const std::string& absolutePath, const std::string& targetVirtualPath) {
     Assimp::Importer importer;
-    // FlipUVs: Assimp UVs are bottom-left origin, ours are top-left (stb rows)
-    // PreTransformVertices: bake node transforms — one section, no hierarchy (#21)
+
     const aiScene* scene = importer.ReadFile(absolutePath,
         aiProcess_Triangulate | aiProcess_GenSmoothNormals |
         aiProcess_JoinIdenticalVertices | aiProcess_PreTransformVertices |
@@ -74,7 +72,7 @@ bool ImportMeshFile(const std::string& absolutePath) {
         return false;
     }
     if (scene->mNumMaterials > 1) // Assimp always emits one default material
-        LUTUM_INFO("Import: '{}' has materials — ignored (one-section StaticMesh)", absolutePath);
+        LUTUM_INFO("Import: '{}' has materials, ignored (one-section StaticMesh)", absolutePath);
 
     MeshData mesh;
     for (unsigned m = 0; m < scene->mNumMeshes; ++m) {
@@ -105,16 +103,16 @@ bool ImportMeshFile(const std::string& absolutePath) {
         return false;
     }
 
-    const std::string target = TargetPath(absolutePath);
-    if (!FileSystem::WriteBytes(target, MeshAsset::Encode(mesh, PreserveOrGenerateId(target))))
+    if (!FileSystem::WriteBytes(targetVirtualPath,
+            MeshAsset::Encode(mesh, PreserveOrGenerateId(targetVirtualPath))))
         return false;
 
     LUTUM_INFO("Import: '{}' -> '{}' ({} vertices, {} triangles)",
-               absolutePath, target, mesh.vertices.size(), mesh.indices.size() / 3);
+               absolutePath, targetVirtualPath, mesh.vertices.size(), mesh.indices.size() / 3);
     return true;
 }
 
-bool ImportTextureFile(const std::string& absolutePath) {
+bool ImportTextureFile(const std::string& absolutePath, const std::string& targetVirtualPath) {
     const auto bytes = ReadSourceFile(absolutePath);
     if (!bytes)
         return false;
@@ -124,12 +122,11 @@ bool ImportTextureFile(const std::string& absolutePath) {
         return false;
     }
 
-    const std::string target = TargetPath(absolutePath);
-    if (!FileSystem::WriteBytes(target, TextureAsset::Encode(*bytes, PreserveOrGenerateId(target))))
+    if (!FileSystem::WriteBytes(targetVirtualPath,
+            TextureAsset::Encode(*bytes, PreserveOrGenerateId(targetVirtualPath))))
         return false;
 
-    LUTUM_INFO("Import: '{}' -> '{}'", absolutePath, target);
+    LUTUM_INFO("Import: '{}' -> '{}'", absolutePath, targetVirtualPath);
     return true;
 }
-
 } // Lutum::AssetImport

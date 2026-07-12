@@ -22,6 +22,8 @@
 #include "Editor/Panels/InspectorPanel.hpp"
 #include "Editor/Panels/ResourcesPanel.hpp"
 #include "Editor/Panels/LogPanel.hpp"
+#include "Lutum/Assets/AssetRegistry.hpp"
+#include "Lutum/Assets/MaterialAsset.hpp"
 
 namespace Lutum {
 class RenderTarget;
@@ -29,6 +31,12 @@ namespace Curia { class Registry; class Scheduler; }
 
 class EditorUI {
 public:
+    enum class PendingLevelAction : uint8_t {
+        NONE,
+        NEW_LEVEL,
+        OPEN_LEVEL,
+    };
+
     // Build all panels for this frame
     // Call between Debug::UI::BeginFrame and the renderer's UI pass
     void Draw(Curia::Registry& registry, Curia::Scheduler& scheduler, RenderTarget& sceneTarget);
@@ -57,8 +65,6 @@ private:
     bool m_layoutResetRequested = false;
 
     void DrawMainMenuBar(Curia::Registry& registry);
-    void SaveSnapshotToDisk(Curia::Registry& registry);
-    void LoadSnapshotFromDisk(Curia::Registry& registry);
 
     EditorContext m_context;
     ViewportPanel m_viewportPanel;
@@ -70,12 +76,31 @@ private:
     ResourcesPanel m_resourcesPanel;
     LogPanel m_logPanel;
 
+    PendingLevelAction m_pendingLevelAction = PendingLevelAction::NONE;
     std::vector<std::string> m_recentProjects;
+    void ResolvePendingLevelAction();
+    void ExecutePendingLevelAction();
 
     float m_lastWorkWidth = 0.0f;
     float m_lastWorkHeight = 0.0f;
 
     void ProcessDialogResults();
+
+    // --- Material Editor ---
+    struct MaterialEditorState {
+        bool open = false;
+        AssetID id{};
+        std::string virtualPath;
+        MaterialData data{};
+        bool dirty = false;
+    };
+
+    std::vector<std::string> m_pendingImportSources;
+    bool m_pendingImportIsMesh = false;
+    MaterialEditorState m_materialEditor;
+
+    void DrawMaterialEditor();
+    void OpenMaterialEditor(const Assets::AssetInfo& info);
 };
 } // Lutum
 

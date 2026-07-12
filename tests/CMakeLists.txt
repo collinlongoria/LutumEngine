@@ -5,6 +5,7 @@ add_executable(LutumTests
         Core/TestFileSystem.cpp
         Assets/TestAssets.cpp
         Assets/TestAssetPayloads.cpp
+        ECS/TestSnapshotFilter.cpp
 )
 
 target_link_libraries(LutumTests PRIVATE

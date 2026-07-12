@@ -24,7 +24,7 @@ public:
     void Draw(Curia::Registry& registry, EditorContext& context);
 
 private:
-    static void DrawField(const std::string& componentName, const Curia::FieldInfo& field, std::byte* base);
+    bool DrawField(const std::string& componentName, const Curia::FieldInfo& field, std::byte* base);
 };
 } // Lutum
 
